@@ -1,2 +1,2 @@
-create database if not exists `clever-quartz` default character set = utf8;
-use `clever-quartz`;
+create database if not exists `clever-storage` default character set = utf8;
+use `clever-storage`;
