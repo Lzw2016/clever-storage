@@ -19,7 +19,7 @@ logging:
 ### Spring配置
 ###################################################################################
 spring:
-  profiles.active: dev
+  profiles.active: prod
   application.name: clever-storage-server
   aop.proxy-target-class: true
 
