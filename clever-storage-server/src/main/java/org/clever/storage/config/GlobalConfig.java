@@ -17,6 +17,11 @@ import java.io.Serializable;
 public class GlobalConfig {
 
     /**
+     * 上传限速配置(?byte/s)
+     */
+    private long speedLimit = 1024 * 1024 * 2;
+
+    /**
      * 文件上传到本地硬盘的基础路径
      */
     @NestedConfigurationProperty

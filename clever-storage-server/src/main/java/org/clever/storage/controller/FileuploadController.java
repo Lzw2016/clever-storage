@@ -1,5 +1,6 @@
 package org.clever.storage.controller;
 
+import lombok.extern.slf4j.Slf4j;
 import org.clever.storage.dto.response.UploadFilesRes;
 import org.clever.storage.service.IStorageService;
 import org.clever.storage.utils.FileUploadUtils;
@@ -17,6 +18,7 @@ import javax.servlet.http.HttpServletResponse;
  */
 @RestController
 @RequestMapping("/api")
+@Slf4j
 public class FileuploadController {
 
     @Autowired

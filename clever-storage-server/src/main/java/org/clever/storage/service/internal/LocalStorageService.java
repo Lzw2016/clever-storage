@@ -56,7 +56,7 @@ public class LocalStorageService extends BaseService implements IStorageService 
         if (file.exists() && file.isFile()) {
             throw new IllegalArgumentException("文件上传到本地硬盘的基础路径(diskBasePath)=[" + diskBasePath + "]不能是文件");
         }
-        if (!file.exists() && file.mkdir()) {
+        if (!file.exists() && file.mkdirs()) {
             log.info("[本地服务器]创建文件夹：" + diskBasePath);
         }
 
@@ -134,7 +134,7 @@ public class LocalStorageService extends BaseService implements IStorageService 
         }
         fileInfo.setNewName(newName);
         // 上传文件存储到当前服务器的路径(相对路径，相对于 FILE_STORAGE_PATH)
-        String filePath = StoragePathUtils.createFilePathByDate("");
+        String filePath = StoragePathUtils.generateFilePathByDate("");
         fileInfo.setFilePath(filePath);
         // 计算文件的绝对路径，保存文件
         String absoluteFilePath = diskBasePath + filePath + File.separator + newName;

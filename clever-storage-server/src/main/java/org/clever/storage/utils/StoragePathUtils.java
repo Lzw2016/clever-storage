@@ -16,7 +16,7 @@ public class StoragePathUtils {
      * @param basePath 存储文件基路径
      * @return 返回存储文件完整路径，类似：basePath + /yyyy/yyyy-MM/yyyy-MM-dd
      */
-    public static String createFilePathByDate(String basePath) {
+    public static String generateFilePathByDate(String basePath) {
         long dateTime = System.currentTimeMillis();
         String dateStr = DateTimeUtils.getDate(dateTime, "yyyy-MM-dd");
         String[] array = dateStr.split("-");
