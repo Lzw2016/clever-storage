@@ -26,8 +26,11 @@ spring:
   servlet: #------------------------------------------------------------ 文件上传配置
     multipart:
       enabled: true
-      max-file-size: 1MB
-      max-request-size: 10MB
+      location: ${clever.config.local-storage-config.disk-base-path}\tmp
+      file-size-threshold: 1MB
+      resolve-lazily: true
+      max-file-size: 50MB
+      max-request-size: 100MB
 
   http: #------------------------------------------------------------------ http配置
     converters:
@@ -139,6 +142,10 @@ mybatis-plus:
 ### clever security配置
 ###################################################################################
 clever:
+  config:
+    local-storage-config:
+      disk-base-path: G:\filestoragepath
+      stored-node: 10.2.159.100
   security:
     enable-debug: false
     sys-name: ${spring.application.name}
@@ -200,6 +207,7 @@ clever:
       logout-url: '/logout.json'
       logout-success-need-redirect: false
       logout-success-redirect-page: '/login.html'
+
 ###################################################################################
 ### Feign配置
 ###################################################################################
@@ -207,7 +215,6 @@ clever:
 clever-security-server:
   ribbon:
     listOfServers: '127.0.0.1:28080'
-
 
 
 

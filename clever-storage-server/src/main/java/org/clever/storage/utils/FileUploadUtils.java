@@ -1,81 +1,70 @@
-//package org.clever.storage.utils;
-//
-//import org.slf4j.Logger;
-//import org.slf4j.LoggerFactory;
-//import org.springframework.web.multipart.MultipartFile;
-//import org.springframework.web.multipart.MultipartHttpServletRequest;
-//
-//import javax.servlet.http.HttpServletRequest;
-//import javax.servlet.http.HttpServletResponse;
-//import java.util.ArrayList;
-//import java.util.List;
-//import java.util.Map;
-//
-///**
-// * 作者：LiZW <br/>
-// * 创建时间：2017/1/17 17:01 <br/>
-// */
-//public class FileUploadUtils {
-//    /**
-//     * 日志对象
-//     */
-//    private final static Logger logger = LoggerFactory.getLogger(FileUploadUtils.class);
-//
-//    /**
-//     * 上传文件通用方法
-//     *
-//     * @return 失败返回null, 务必调用 message.setResult(fileInfoList)
-//     */
-//    public static List<FileInfo> upload(String fileSource, IStorageService storageService, HttpServletRequest request, HttpServletResponse response, AjaxMessage message) {
-//        if (!(request instanceof MultipartHttpServletRequest)) {
-//            message.setSuccess(false);
-//            message.setFailMessage("当前请求并非上传文件的请求");
-//            return null;
-//        }
-//        // 保存上传文件
-//        MultipartHttpServletRequest multipartRequest = (MultipartHttpServletRequest) request;
-//        long uploadStart = System.currentTimeMillis();
-//        Map<String, MultipartFile> fileMap = multipartRequest.getFileMap();
-//        long uploadEnd = System.currentTimeMillis();
-//        // 计算上传时间
-//        int fileCount = 0;
-//        for (String fileName : fileMap.keySet()) {
-//            MultipartFile mFile = fileMap.get(fileName);
-//            if (mFile.isEmpty()) {
-//                continue;
-//            }
-//            fileCount++;
-//        }
-//        if (fileCount <= 0) {
-//            message.setSuccess(false);
-//            message.setFailMessage("请选择上传的文件");
-//            return null;
-//        }
-//        long uploadTimeSum = uploadEnd - uploadStart;
-//        long uploadTimeAvg = uploadTimeSum / fileCount;
-//        logger.info("总共上传文件数量{}个,总共上传时间{}ms. 平均每个文件上传时间{}ms", fileCount, uploadTimeSum, uploadTimeAvg);
-//        List<FileInfo> fileInfoList = new ArrayList<>();
-//        for (String fileName : fileMap.keySet()) {
-//            MultipartFile mFile = fileMap.get(fileName);
-//            if (mFile.isEmpty()) {
-//                continue;
-//            }
-//            try {
-//                FileInfo fileInfo = storageService.saveFile(uploadTimeAvg, fileSource, mFile);
-//                fileInfoList.add(fileInfo);
-//            } catch (Throwable e) {
-//                logger.error("文件上传失败", e);
-//            }
-//        }
-//        if (fileCount <= 0) {
-//            message.setSuccess(false);
-//            message.setFailMessage("此请求没有上传文件");
-//            return null;
-//        }
-//        message.setSuccessMessage("一共上传文件数量" + fileCount + "个，上传成功数量" + fileInfoList.size() + "个");
-//        return fileInfoList;
-//    }
-//
+package org.clever.storage.utils;
+
+import lombok.extern.slf4j.Slf4j;
+import org.clever.common.exception.BusinessException;
+import org.clever.storage.dto.response.UploadFilesRes;
+import org.clever.storage.entity.FileInfo;
+import org.clever.storage.service.IStorageService;
+import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.multipart.MultipartHttpServletRequest;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.util.Map;
+
+/**
+ * 作者：LiZW <br/>
+ * 创建时间：2017/1/17 17:01 <br/>
+ */
+@Slf4j
+public class FileUploadUtils {
+
+    /**
+     * 上传文件通用方法
+     *
+     * @return 失败返回null, 务必调用 message.setResult(fileInfoList)
+     */
+    public static UploadFilesRes upload(String fileSource, IStorageService storageService, HttpServletRequest request, HttpServletResponse response) {
+        if (!(request instanceof MultipartHttpServletRequest)) {
+            throw new BusinessException("当前请求并非上传文件的请求");
+        }
+        // 保存上传文件
+        MultipartHttpServletRequest multipartRequest = (MultipartHttpServletRequest) request;
+        long uploadStart = System.currentTimeMillis();
+        Map<String, MultipartFile> fileMap = multipartRequest.getFileMap();
+        long uploadEnd = System.currentTimeMillis();
+        // 计算上传时间
+        int fileCount = 0;
+        for (String fileName : fileMap.keySet()) {
+            MultipartFile mFile = fileMap.get(fileName);
+            if (mFile.isEmpty()) {
+                continue;
+            }
+            fileCount++;
+        }
+        if (fileCount <= 0) {
+            throw new BusinessException("上传文件不能为空");
+        }
+        long uploadTimeSum = uploadEnd - uploadStart;
+        long uploadTimeAvg = uploadTimeSum / fileCount;
+        log.info("总共上传文件数量{}个,总共上传时间{}ms. 平均每个文件上传时间{}ms", fileCount, uploadTimeSum, uploadTimeAvg);
+        UploadFilesRes uploadFilesRes = new UploadFilesRes();
+        for (String fileName : fileMap.keySet()) {
+            MultipartFile mFile = fileMap.get(fileName);
+            if (mFile.isEmpty()) {
+                continue;
+            }
+            try {
+                FileInfo fileInfo = storageService.saveFile(uploadTimeAvg, fileSource, mFile);
+                uploadFilesRes.getSuccessList().add(fileInfo);
+            } catch (Throwable e) {
+                log.error("文件上传失败", e);
+                uploadFilesRes.setFailCount(uploadFilesRes.getFailCount() + 1);
+            }
+        }
+        return uploadFilesRes;
+    }
+
 //    /**
 //     * 通过文件签名实现文件秒传，只能一次上传一个文件<br/>
 //     *
@@ -128,4 +117,4 @@
 //        }
 //        return fileInfo;
 //    }
-//}
+}
