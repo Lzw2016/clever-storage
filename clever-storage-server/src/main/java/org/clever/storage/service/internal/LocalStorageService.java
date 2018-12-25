@@ -7,15 +7,16 @@ import org.clever.common.server.service.BaseService;
 import org.clever.common.utils.IDCreateUtils;
 import org.clever.common.utils.IPAddressUtils;
 import org.clever.storage.config.GlobalConfig;
+import org.clever.storage.dto.request.UploadFileReq;
 import org.clever.storage.entity.EnumConstant;
 import org.clever.storage.entity.FileInfo;
 import org.clever.storage.mapper.FileInfoMapper;
 import org.clever.storage.service.IStorageService;
 import org.clever.storage.utils.FileDigestUtils;
+import org.clever.storage.utils.FileUploadUtils;
 import org.clever.storage.utils.StoragePathUtils;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
@@ -28,13 +29,9 @@ import java.util.Set;
  * 作者：LiZW <br/>
  * 创建时间：2016/11/17 22:17 <br/>
  */
-@Transactional(readOnly = true)
-@Service("LocalStorageService")
+@Component("LocalStorageService")
 @Slf4j
 public class LocalStorageService extends BaseService implements IStorageService {
-
-    @Autowired
-    private FileInfoMapper fileInfoMapper;
 
     /**
      * 上传文件存储到当前服务器的路径，如：F:\fileStoragePath<br>
@@ -46,6 +43,9 @@ public class LocalStorageService extends BaseService implements IStorageService 
      * 文件存储节点, 只支持本机IP
      */
     private final String storedNode;
+
+    @Autowired
+    private FileInfoMapper fileInfoMapper;
 
     public LocalStorageService(GlobalConfig globalConfig) {
         diskBasePath = globalConfig.getLocalStorageConfig().getDiskBasePath();
@@ -71,56 +71,50 @@ public class LocalStorageService extends BaseService implements IStorageService 
         }
     }
 
-
-//    @Override
-//    public FileInfo lazySaveFile(String fileName, String fileDigest, Character digestType) throws Exception {
-//        FileInfo dbFileInfo;
-//        if (StringUtils.isBlank(fileDigest) || digestType == null) {
-//            return null;
-//        }
-//        // 到数据库查找判断此文件是否已经上传过了 - 此文件是否已经上传过了，不需要重复保存
-//        dbFileInfo = fileInfoDao.findFileInfoByDigest(fileDigest, digestType);
-//        if (dbFileInfo == null) {
-//            logger.debug("[本地服务器]秒传失败，文件没有上传过");
-//            return null;
-//        }
-//        if (StringUtils.isBlank(dbFileInfo.getFilePath()) || StringUtils.isBlank(dbFileInfo.getNewName())) {
-//            logger.warn("[本地服务器]秒传失败，数据库里文件(FilePath、NewName)信息为空，文件信息UUID={}", dbFileInfo.getUuid());
-//            return null;
-//        }
-//        String filepath = FILE_STORAGE_PATH + dbFileInfo.getFilePath() + File.separator + dbFileInfo.getNewName();
-//        File file = new File(filepath);
-//        if (!file.exists() || !file.isFile()) {
-//            logger.warn("[本地服务器]秒传失败，上传文件不存在(可能已经被删除)，文件路径[{}]", filepath);
-//            return null;
-//        }
-//        logger.warn("[本地服务器]文件秒传成功，文件存储路径[{}]", filepath);
-//        return dbFileInfo;
-//    }
-
-    @Transactional
     @Override
-    public FileInfo saveFile(long uploadTime, String fileSource, MultipartFile multipartFile) throws Exception {
+    public FileInfo lazySaveFile(String fileName, String digest, Integer digestType) {
+        if (StringUtils.isBlank(digest) || digestType == null) {
+            return null;
+        }
+        // 到数据库查找判断此文件是否已经上传过了 - 此文件是否已经上传过了，不需要重复保存
+        FileInfo dbFileInfo = fileInfoMapper.getFileInfoByDigest(digest, digestType);
+        if (dbFileInfo == null) {
+            log.debug("[本地服务器]秒传失败，文件没有上传过");
+            return null;
+        }
+        if (StringUtils.isBlank(dbFileInfo.getFilePath()) || StringUtils.isBlank(dbFileInfo.getNewName())) {
+            log.warn("[本地服务器]秒传失败，数据库里文件(FilePath、NewName)信息为空，文件ID={}", dbFileInfo.getId());
+            return null;
+        }
+        String filepath = diskBasePath + dbFileInfo.getFilePath() + File.separator + dbFileInfo.getNewName();
+        File file = new File(filepath);
+        if (!file.exists() || !file.isFile()) {
+            log.warn("[本地服务器]秒传失败，上传文件不存在(可能已经被删除)，文件路径[{}]", filepath);
+            return null;
+        }
+        log.info("[本地服务器]文件秒传成功，文件存储路径[{}]", filepath);
+        return dbFileInfo;
+    }
+
+    @Override
+    public FileInfo saveFile(UploadFileReq uploadFileReq, long uploadTime, MultipartFile multipartFile) throws Exception {
         // 设置文件签名类型 和 文件签名
         String digest;
         try (InputStream inputStream = multipartFile.getInputStream()) {
             digest = FileDigestUtils.FileDigestByMD5(inputStream);
         }
-//        // 通过文件签名检查服务器端是否有相同文件
-//        FileInfo lazyFileInfo = this.lazySaveFile(multipartFile.getOriginalFilename(), digest, FileInfo.MD5_DIGEST);
-//        if (lazyFileInfo != null) {
-//            return lazyFileInfo;
-//        }
+        // 通过文件签名检查服务器端是否有相同文件
+        FileInfo lazyFileInfo = this.lazySaveFile(multipartFile.getOriginalFilename(), digest, EnumConstant.DigestType_1);
+        if (lazyFileInfo != null) {
+            return lazyFileInfo;
+        }
         // 服务器端不存在相同文件
         FileInfo fileInfo = new FileInfo();
-        // TODO 抽离
-        fileInfo.setPublicRead(EnumConstant.PublicRead_0);
-        fileInfo.setPublicWrite(EnumConstant.PublicWrite_0);
-        fileInfo.setFileSource(fileSource);
+        fileInfo = FileUploadUtils.fillFileInfo(fileInfo, multipartFile);
+        fileInfo.setPublicRead(uploadFileReq.getPublicRead());
+        fileInfo.setPublicWrite(uploadFileReq.getPublicWrite());
+        fileInfo.setFileSource(uploadFileReq.getFileSource());
         fileInfo.setUploadTime(uploadTime);
-        // 基本属性
-        fileInfo.setFileName(multipartFile.getOriginalFilename());
-        fileInfo.setFileSize(multipartFile.getSize());
         fileInfo.setDigest(digest);
         fileInfo.setDigestType(EnumConstant.DigestType_1);
         // 上传文件的存储类型：当前服务器硬盘

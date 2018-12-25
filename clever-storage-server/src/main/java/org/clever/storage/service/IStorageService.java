@@ -1,5 +1,6 @@
 package org.clever.storage.service;
 
+import org.clever.storage.dto.request.UploadFileReq;
 import org.clever.storage.entity.FileInfo;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -12,52 +13,46 @@ import org.springframework.web.multipart.MultipartFile;
 public interface IStorageService {
 
     /**
-     * 文件打开最大速度限制 (1024 * 1024 * 1 = 1MB)
+     * 根据文件签名保存文件，实现文件秒传<br>
+     *
+     * @param fileName   文件名称
+     * @param digest     文件签名
+     * @param digestType 签名类型
+     * @return 保存成功返回文件信息，失败返回null
      */
-    long Max_Open_Speed = 1024 * 1024;
-
-//    /**
-//     * 根据文件签名保存文件，实现文件秒传<br>
-//     *
-//     * @param fileName   文件名称
-//     * @param fileDigest 文件签名
-//     * @param digestType 签名类型
-//     * @return 保存成功返回文件信息，失败返回null
-//     * @throws Exception 操作失败
-//     */
-//    FileInfo lazySaveFile(String fileName, String fileDigest, Character digestType) throws Exception;
+    FileInfo lazySaveFile(String fileName, String digest, Integer digestType);
 
     /**
      * 保存文件，当文件较大时此方法会占用磁盘IO，因为common-fileupload会将上传文件写入硬盘的临时文件<br>
      * <p>
      * <b>注意：如果上传的文件在服务器端存在(通过文件签名判断)，就不会存储文件只会新增文件引用</b>
      *
+     * @param uploadFileReq 请求上传参数
      * @param uploadTime    文件上传所用时间
-     * @param fileSource    上传文件来源(可以是系统模块名称)
      * @param multipartFile 上传的文件信息
      * @return 返回存储后的文件信息
      * @throws Exception 保存失败抛出异常
      */
-    FileInfo saveFile(long uploadTime, String fileSource, MultipartFile multipartFile) throws Exception;
+    FileInfo saveFile(UploadFileReq uploadFileReq, long uploadTime, MultipartFile multipartFile) throws Exception;
 
 //    /**
 //     * 删除服务器端的文件<br>
 //     *
-//     * @param fileInfoUuid 文件信息UUID
-//     * @param lazy         如果值为true表示：只删除当前文件引用；值为false表示：直接从硬盘中删除服务器端文件
+//     * @param newName 文件信息UUID
+//     * @param lazy    如果值为true表示：只删除当前文件引用；值为false表示：直接从硬盘中删除服务器端文件
 //     * @return 1：成功删除fileInfo和服务器端文件；2：只删除了fileInfo；3：fileInfo不存在
 //     */
-//    int deleteFile(Serializable fileInfoUuid, boolean lazy) throws Exception;
+//    int deleteFile(String newName, boolean lazy);
 
 //    /**
 //     * 判断文件在服务端是否存在<br>
 //     * <p>
 //     * <b>注意：此方法的返回值与数据库中是否存在fileInfo无关系</b>
 //     *
-//     * @param fileInfoUuid 文件信息UUID
+//     * @param newName 文件名称
 //     * @return 不存在返回null，存在返回文件信息
 //     */
-//    FileInfo isExists(Serializable fileInfoUuid) throws Exception;
+//    FileInfo isExists(String newName);
 
 //    /**
 //     * 打开文件到OutputStream<br>
