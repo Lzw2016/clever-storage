@@ -30,9 +30,9 @@ public class FileUploadUtils {
         }
         // 保存上传文件
         MultipartHttpServletRequest multipartRequest = (MultipartHttpServletRequest) request;
-        long uploadStart = System.currentTimeMillis();
+        final long uploadStart = System.currentTimeMillis();
         Map<String, MultipartFile> fileMap = multipartRequest.getFileMap();
-        long uploadEnd = System.currentTimeMillis();
+        final long uploadEnd = System.currentTimeMillis();
         // 计算上传时间
         int fileCount = 0;
         for (String fileName : fileMap.keySet()) {
@@ -45,17 +45,23 @@ public class FileUploadUtils {
         if (fileCount <= 0) {
             throw new BusinessException("上传文件不能为空");
         }
-        long uploadTimeSum = uploadEnd - uploadStart;
-        long uploadTimeAvg = uploadTimeSum / fileCount;
+        final long uploadTimeSum = uploadEnd - uploadStart;
+        final long uploadTimeAvg = uploadTimeSum / fileCount;
         log.info("总共上传文件数量{}个,总共上传时间{}ms. 平均每个文件上传时间{}ms", fileCount, uploadTimeSum, uploadTimeAvg);
+        // TODO 解析请求参数
+        log.info("# ---- {}", request.getParameter("333"));
         UploadFilesRes uploadFilesRes = new UploadFilesRes();
         for (String fileName : fileMap.keySet()) {
             MultipartFile mFile = fileMap.get(fileName);
             if (mFile.isEmpty()) {
                 continue;
             }
+            long uploadTime = uploadTimeAvg;
+            if (mFile.getSize() > 0) {
+                uploadTime = mFile.getSize() * uploadTimeSum / multipartRequest.getContentLengthLong();
+            }
             try {
-                FileInfo fileInfo = storageService.saveFile(uploadTimeAvg, fileSource, mFile);
+                FileInfo fileInfo = storageService.saveFile(uploadTime, fileSource, mFile);
                 uploadFilesRes.getSuccessList().add(fileInfo);
             } catch (Throwable e) {
                 log.error("文件上传失败", e);
