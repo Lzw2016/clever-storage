@@ -33,11 +33,6 @@ public class FileuploadController {
         return manageStorageService.upload(request);
     }
 
-    /**
-     * 通过文件签名实现文件秒传，只能一次上传一个文件<br/>
-     * 文件秒传：实际上是通过文件签名在以前上传的文件中找出一样的文件，并未真正的上传文件<br/>
-     * <b>注意：文件秒传取决于此文件已经上传过了而且使用的文件签名类型相同</b>
-     */
     @ApiOperation("文件秒传")
     @PostMapping("/lazy_upload")
     public FileInfo uploadLazy(@RequestBody @Validated FileUploadLazyReq fileUploadLazyReq) {
@@ -47,6 +42,6 @@ public class FileuploadController {
     @ApiOperation("根据文件UUID，下载文件")
     @GetMapping("/download/{newName}")
     public void download(HttpServletRequest request, HttpServletResponse response, @PathVariable String newName) {
-//        log.info("### ========== {}", newName);
+        manageStorageService.openFile(request, response, newName);
     }
 }

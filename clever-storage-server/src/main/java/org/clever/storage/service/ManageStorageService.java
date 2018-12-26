@@ -4,6 +4,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.math.NumberUtils;
 import org.clever.common.exception.BusinessException;
 import org.clever.common.utils.codec.EncodeDecodeUtils;
+import org.clever.common.utils.exception.ExceptionUtils;
 import org.clever.common.utils.mapper.BeanMapper;
 import org.clever.common.utils.validator.BaseValidatorUtils;
 import org.clever.common.utils.validator.ValidatorFactoryUtils;
@@ -14,8 +15,7 @@ import org.clever.storage.entity.EnumConstant;
 import org.clever.storage.entity.FileInfo;
 import org.clever.storage.utils.FileUploadUtils;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
 
@@ -30,8 +30,7 @@ import java.util.Objects;
  * 作者：LiZW <br/>
  * 创建时间：2017/1/17 17:01 <br/>
  */
-@Transactional(readOnly = true)
-@Service
+@Component
 @Slf4j
 public class ManageStorageService {
 
@@ -58,12 +57,6 @@ public class ManageStorageService {
         return uploadFileReq;
     }
 
-    /**
-     * 上传文件通用方法
-     *
-     * @return 失败返回null, 务必调用 message.setResult(fileInfoList)
-     */
-    @Transactional
     public UploadFilesRes upload(HttpServletRequest request) {
         if (!(request instanceof MultipartHttpServletRequest)) {
             throw new BusinessException("当前请求并非上传文件的请求");
@@ -112,12 +105,6 @@ public class ManageStorageService {
         return uploadFilesRes;
     }
 
-    /**
-     * 通过文件签名实现文件秒传，只能一次上传一个文件<br/>
-     *
-     * @return 失败返回null, 务必调用 message.setResult(fileInfo)
-     */
-    @Transactional
     public FileInfo uploadLazy(FileUploadLazyReq fileUploadLazyReq) {
         // 验证是否是Hex编码
         String fileDigest = fileUploadLazyReq.getFileDigest().toLowerCase();
@@ -157,21 +144,24 @@ public class ManageStorageService {
         return fileInfo;
     }
 
-    public void openFile(HttpServletRequest request, HttpServletResponse response, String newName) throws IOException {
+    public void openFile(HttpServletRequest request, HttpServletResponse response, String newName) {
         FileInfo fileInfo = storageService.getFileInfo(newName);
         if (fileInfo == null) {
             // 404
+            return;
         }
         // 文件存在，下载文件
-        response.setContentType("multipart/form-data");
         String fileName = EncodeDecodeUtils.browserDownloadFileName(request.getHeader("User-Agent"), fileInfo.getFileName());
+        response.setContentType("multipart/form-data");
         response.setHeader("Content-Disposition", "attachment;fileName=" + fileName);
         response.setHeader("Content-Length", fileInfo.getFileSize().toString());
-        OutputStream outputStream = response.getOutputStream();
-//        fileInfo = storageService.openFileSpeedLimit(downloadFileVo.getUuid(), outputStream, -1);
-//        // outputStream.close(); //Servlet容器会关闭
-//        if (fileInfo != null) {
-//            log.info("文件下载成功, 文件NewName={}", fileInfo.getNewName());
-//        }
+        try {
+            OutputStream outputStream = response.getOutputStream();
+            storageService.openFileSpeedLimit(fileInfo, outputStream, -1);
+            // outputStream.close(); //Servlet容器会关闭
+            log.info("文件下载成功, 文件NewName={}", fileInfo.getNewName());
+        } catch (IOException e) {
+            throw ExceptionUtils.unchecked(e);
+        }
     }
 }

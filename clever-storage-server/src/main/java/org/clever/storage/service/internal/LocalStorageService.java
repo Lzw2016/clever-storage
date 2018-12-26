@@ -1,6 +1,8 @@
 package org.clever.storage.service.internal;
 
+import com.google.common.util.concurrent.RateLimiter;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.clever.common.server.service.BaseService;
@@ -16,11 +18,15 @@ import org.clever.storage.utils.FileDigestUtils;
 import org.clever.storage.utils.FileUploadUtils;
 import org.clever.storage.utils.StoragePathUtils;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
+import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.Objects;
 import java.util.Set;
 
@@ -30,7 +36,8 @@ import java.util.Set;
  * 作者：LiZW <br/>
  * 创建时间：2016/11/17 22:17 <br/>
  */
-@Component("LocalStorageService")
+@Transactional(readOnly = true)
+@Service("LocalStorageService")
 @Slf4j
 public class LocalStorageService extends BaseService implements IStorageService {
 
@@ -75,6 +82,7 @@ public class LocalStorageService extends BaseService implements IStorageService 
         }
     }
 
+    @Transactional
     @Override
     public FileInfo lazySaveFile(UploadFileReq uploadFileReq, long uploadTime, String fileName, String digest, Integer digestType) {
         if (StringUtils.isBlank(digest) || digestType == null) {
@@ -114,6 +122,7 @@ public class LocalStorageService extends BaseService implements IStorageService 
         return newFileInfo;
     }
 
+    @Transactional
     @Override
     public FileInfo saveFile(UploadFileReq uploadFileReq, long uploadTime, MultipartFile multipartFile) throws Exception {
         // 设置文件签名类型 和 文件签名
@@ -241,39 +250,39 @@ public class LocalStorageService extends BaseService implements IStorageService 
 //        return null;
 //    }
 
-//    @Override
-//    public FileInfo openFileSpeedLimit(Serializable fileInfoUuid, OutputStream outputStream, long maxSpeed) throws Exception {
-//        if (maxSpeed <= 0) {
-//            maxSpeed = Max_Open_Speed;
-//        }
-//        RateLimiter rateLimiter = RateLimiter.create(maxSpeed);
-//        FileInfo fileInfo = fileInfoDao.getFileInfoByUuid(fileInfoUuid);
-//        if (fileInfo == null) {
-//            return null;
-//        }
-//        String fullPath = FILE_STORAGE_PATH + fileInfo.getFilePath();
-//        fullPath = FilenameUtils.concat(fullPath, fileInfo.getNewName());
-//        File file = new File(fullPath);
-//        if (file.exists() && file.isFile()) {
-//            try (InputStream inputStream = FileUtils.openInputStream(file)) {
-//                byte[] data = new byte[32 * 1024];
-//                int readByte;
-//                double sleepTime;
-//                while (true) {
-//                    readByte = inputStream.read(data);
-//                    if (readByte <= 0) {
-//                        break;
-//                    }
-//                    outputStream.write(data);
-//                    sleepTime = rateLimiter.acquire(readByte);
-//                    logger.debug("[本地服务器]打开文件UUID:[{}], 读取字节数:[{}], 休眠时间:[{}]秒", fileInfo.getUuid(), readByte, sleepTime);
-//                }
-//                outputStream.flush();
-//            }
-//            return fileInfo;
-//        }
-//        logger.warn("[本地服务器]文件引用[UUID={}]对应的文件不存在", fileInfo.getUuid());
-//        return null;
-//    }
+    @SuppressWarnings("UnstableApiUsage")
+    @Transactional(propagation = Propagation.NEVER)
+    @Override
+    public void openFileSpeedLimit(FileInfo fileInfo, OutputStream outputStream, long maxSpeed) throws IOException {
+        if (fileInfo == null) {
+            throw new IllegalArgumentException("文件信息不能为空");
+        }
+        if (maxSpeed <= 0) {
+            maxSpeed = Max_Open_Speed;
+        }
+        RateLimiter rateLimiter = RateLimiter.create(maxSpeed);
+        String fullPath = diskBasePath + fileInfo.getFilePath();
+        fullPath = FilenameUtils.concat(fullPath, fileInfo.getNewName());
+        File file = new File(fullPath);
+        if (file.exists() && file.isFile()) {
+            try (InputStream inputStream = FileUtils.openInputStream(file)) {
+                byte[] data = new byte[32 * 1024];
+                int readByte;
+                double sleepTime;
+                while (true) {
+                    readByte = inputStream.read(data);
+                    if (readByte <= 0) {
+                        break;
+                    }
+                    outputStream.write(data);
+                    sleepTime = rateLimiter.acquire(readByte);
+                    log.debug("[本地服务器]打开文件NewName:[{}], 读取字节数:[{}], 休眠时间:[{}]秒", fileInfo.getNewName(), readByte, sleepTime);
+                }
+                outputStream.flush();
+            }
+            return;
+        }
+        log.warn("[本地服务器]文件引用[NewName={}]对应的文件不存在", fileInfo.getNewName());
+    }
 }
 

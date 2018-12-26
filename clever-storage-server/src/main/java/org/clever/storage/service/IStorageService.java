@@ -4,6 +4,9 @@ import org.clever.storage.dto.request.UploadFileReq;
 import org.clever.storage.entity.FileInfo;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
+import java.io.OutputStream;
+
 /**
  * 上传文件存储接口<br/>
  * <p>
@@ -11,6 +14,11 @@ import org.springframework.web.multipart.MultipartFile;
  * 创建时间：2016/11/17 22:10 <br/>
  */
 public interface IStorageService {
+
+    /**
+     * 文件打开最大速度限制 (1024 * 1024 * 1 = 1MB)
+     */
+    long Max_Open_Speed = 1024 * 1024;
 
     /**
      * 根据文件签名保存文件，实现文件秒传<br>
@@ -64,16 +72,15 @@ public interface IStorageService {
 //     */
 //    FileInfo openFile(Serializable fileInfoUuid, OutputStream outputStream) throws Exception;
 
-//    /**
-//     * 打开文件到OutputStream(限制打开文件速度，适用于客户端下载文件) 可以控制打开速度<br>
-//     * <b>注意：使用此方法会限制打开文件速度(字节/秒)</b>
-//     *
-//     * @param fileInfoUuid 文件信息UUID
-//     * @param outputStream 输出流，用于打开文件
-//     * @param maxSpeed     最大打开文件速度(字节/秒)，值小于等于0，则使用默认限制速度 {@link #Max_Open_Speed}
-//     * @return FileInfo(文件信息)。 文件不存在返回null
-//     * @throws Exception 操作失败
-//     */
-//    FileInfo openFileSpeedLimit(Serializable fileInfoUuid, OutputStream outputStream, long maxSpeed) throws Exception;
+    /**
+     * 打开文件到OutputStream(限制打开文件速度，适用于客户端下载文件) 可以控制打开速度<br>
+     * <b>注意：使用此方法会限制打开文件速度(字节/秒)</b>
+     *
+     * @param fileInfo     文件信息
+     * @param outputStream 输出流，用于打开文件
+     * @param maxSpeed     最大打开文件速度(字节/秒)，值小于等于0，则使用默认限制速度 {@link #Max_Open_Speed}
+     * @throws IOException 操作失败
+     */
+    void openFileSpeedLimit(FileInfo fileInfo, OutputStream outputStream, long maxSpeed) throws IOException;
 }
 
