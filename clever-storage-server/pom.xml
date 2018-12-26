@@ -76,10 +76,10 @@
             <groupId>com.aliyun.oss</groupId>
             <artifactId>aliyun-sdk-oss</artifactId>
         </dependency>
-        <dependency>
-            <groupId>commons-net</groupId>
-            <artifactId>commons-net</artifactId>
-        </dependency>
+        <!--<dependency>-->
+        <!--<groupId>commons-net</groupId>-->
+        <!--<artifactId>commons-net</artifactId>-->
+        <!--</dependency>-->
     </dependencies>
 
     <profiles>

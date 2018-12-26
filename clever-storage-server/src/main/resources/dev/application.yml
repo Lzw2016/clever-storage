@@ -13,6 +13,7 @@ logging:
   config: classpath:logback.xml
   level:
     org.springframework: warn
+    org.apache.commons.net: debug
     org.clever: debug
 
 ###################################################################################

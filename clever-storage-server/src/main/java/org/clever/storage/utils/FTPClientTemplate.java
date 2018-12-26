@@ -1,22 +1,18 @@
 //package org.clever.storage.utils;
 //
+//import lombok.extern.slf4j.Slf4j;
 //import org.apache.commons.io.FilenameUtils;
 //import org.apache.commons.lang3.StringUtils;
 //import org.apache.commons.net.ftp.FTP;
 //import org.apache.commons.net.ftp.FTPClient;
 //import org.apache.commons.net.ftp.FTPFile;
 //import org.apache.commons.net.ftp.FTPReply;
-//import org.cleverframe.common.configuration.FilemanagerConfigNames;
-//import org.cleverframe.common.configuration.IConfig;
-//import org.cleverframe.common.spring.SpringBeanNames;
-//import org.cleverframe.common.spring.SpringContextHolder;
-//import org.slf4j.Logger;
-//import org.slf4j.LoggerFactory;
 //
 //import java.io.Closeable;
 //import java.io.IOException;
 //import java.io.InputStream;
 //import java.net.SocketException;
+//
 //
 ///**
 // * FTP客户端工具，基于commons.net
@@ -25,62 +21,13 @@
 // * 作者：LiZW <br/>
 // * 创建时间：2016/11/19 14:11 <br/>
 // */
+//@Slf4j
 //public class FTPClientTemplate implements Closeable {
-//    /**
-//     * 日志对象
-//     */
-//    private final static Logger logger = LoggerFactory.getLogger(FTPClientTemplate.class);
-//
-//    /**
-//     * 存储上传文件的FTP服务器地址
-//     */
-//    public final static String FTP_HOST;
-//    /**
-//     * 存储上传文件的FTP服务器端口号
-//     */
-//    public final static String FTP_PORT;
-//    /**
-//     * 存储上传文件的FTP服务器用户名
-//     */
-//    public final static String FTP_USER_NAME;
-//    /**
-//     * 存储上传文件的FTP服务器用户密码
-//     */
-//    public final static String FTP_PASSWORD;
-//
-//    static {
-//        IConfig config = SpringContextHolder.getBean(SpringBeanNames.Config);
-//        if (config == null) {
-//            throw new RuntimeException("Spring Bean注入失败, BeanName=" + SpringBeanNames.Config);
-//        }
-//        FTP_HOST = config.getConfig(FilemanagerConfigNames.FTP_HOST);
-//        FTP_PORT = config.getConfig(FilemanagerConfigNames.FTP_PORT);
-//        FTP_USER_NAME = config.getConfig(FilemanagerConfigNames.FTP_USERNAME);
-//        FTP_PASSWORD = config.getConfig(FilemanagerConfigNames.FTP_PASSWORD);
-//        if (logger.isDebugEnabled()) {
-//            String tmp = "\r\n" +
-//                    "#=======================================================================================================================#\r\n" +
-//                    "# 连接文件服务器FTP默认配置：\r\n" +
-//                    "#\t FTP HOST：" + FTP_HOST + "\r\n" +
-//                    "#\t FTP PORT：" + FTP_PORT + "\r\n" +
-//                    "#\t FTP USER NAME：" + FTP_USER_NAME + "\r\n" +
-//                    "#\t FTP PASSWORD：" + FTP_PASSWORD + "\r\n" +
-//                    "#=======================================================================================================================#\r\n";
-//            logger.debug(tmp);
-//        }
-//    }
 //
 //    /**
 //     * apache.commons.net实现的FTPClient
 //     */
 //    private FTPClient ftpclient;
-//
-//    /**
-//     * 连接到配置文件中指定的FTP服务器上<br>
-//     */
-//    public FTPClientTemplate() throws IOException {
-//        this(FTP_HOST, Integer.parseInt(FTP_PORT), FTP_USER_NAME, FTP_PASSWORD);
-//    }
 //
 //    /**
 //     * 连接到指定的FTP服务器上<br>
@@ -97,19 +44,19 @@
 //            int reply = ftpclient.getReplyCode();
 //            if (!FTPReply.isPositiveCompletion(reply)) {
 //                ftpclient.disconnect();
-//                logger.warn("FTP服务器拒绝连接");
+//                log.warn("FTP服务器拒绝连接");
 //            }
 //            if (username != null) {
 //                if (!ftpclient.login(username, password)) {
 //                    ftpclient.disconnect();
-//                    logger.warn("登陆验证失败，请检查账号和密码是否正确");
+//                    log.warn("登陆验证失败，请检查账号和密码是否正确");
 //                }
 //            }
 //        } catch (SocketException e) {
-//            logger.error("登陆验证失败，请检查账号和密码是否正确", e);
+//            log.error("登陆验证失败，请检查账号和密码是否正确", e);
 //            throw e;
 //        } catch (IOException e) {
-//            logger.error("无法用指定用户名和密码连接至指定FTP服务器，请检查是否连接数限制", e);
+//            log.error("无法用指定用户名和密码连接至指定FTP服务器，请检查是否连接数限制", e);
 //            throw e;
 //        }
 //    }
@@ -193,7 +140,10 @@
 //        }
 //        // 得到路径部分
 //        String pathStr = FilenameUtils.getFullPath(path);
-//        return mkdir(pathStr) && ftpclient.storeFile(new String(fileName.getBytes(), ftpclient.getControlEncoding()), inputStream);
+//        if (!mkdir(pathStr)) {
+//            return false;
+//        }
+//        return ftpclient.storeFile(new String(fileName.getBytes(), ftpclient.getControlEncoding()), inputStream);
 //    }
 //
 //    /**
