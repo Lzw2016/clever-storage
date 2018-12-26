@@ -2,6 +2,8 @@ package org.clever.storage.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
 import org.clever.storage.entity.FileInfo;
 import org.springframework.stereotype.Repository;
 
@@ -12,4 +14,7 @@ import org.springframework.stereotype.Repository;
 @Repository
 @Mapper
 public interface FileInfoMapper extends BaseMapper<FileInfo> {
+
+    @Select("select * from file_info where digest=#{digest} and digest_type=#{digestType} limit 1")
+    FileInfo getFileInfoByDigest(@Param("digest") String digest, @Param("digestType") Integer digestType);
 }

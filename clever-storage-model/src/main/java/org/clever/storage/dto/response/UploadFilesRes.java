@@ -23,11 +23,15 @@ public class UploadFilesRes extends BaseResponse {
     @ApiModelProperty("成功列表")
     private List<FileInfo> successList = new ArrayList<>();
 
-    @ApiModelProperty("上传失败数量")
-    private Integer failCount = 0;
+    @ApiModelProperty("上传失败列表")
+    private List<FileInfo> failList = new ArrayList<>();
 
     public Boolean getSuccess() {
-        success = failCount < 0;
+        if (failList == null) {
+            success = true;
+        } else {
+            success = failList.size() <= 0;
+        }
         return success;
     }
 }
