@@ -15,7 +15,7 @@ create table file_info
     digest_type     int(1)          not null                                        comment '文件签名算法类型（1：md5；2：sha-1；）',
     file_size       bigint          not null                                        comment '文件大小，单位：byte(1kb = 1024byte)',
     file_name       varchar(255)    not null                                        comment '文件原名称，用户上传时的名称',
-    new_name        varchar(64)     not null                                        comment '文件当前名称（uuid + 后缀名）',
+    new_name        varchar(64)     not null    unique                              comment '文件当前名称（uuid + 后缀名）',
     public_read     int(1)          not null                                        comment '是否公开可以访问',
     public_write    int(1)          not null                                        comment '是否公开可以修改',
     read_url        varchar(255)                                                    comment '访问url',

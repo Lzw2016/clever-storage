@@ -3,10 +3,14 @@ package org.clever.storage.service;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.math.NumberUtils;
 import org.clever.common.exception.BusinessException;
+import org.clever.common.utils.codec.EncodeDecodeUtils;
+import org.clever.common.utils.mapper.BeanMapper;
 import org.clever.common.utils.validator.BaseValidatorUtils;
 import org.clever.common.utils.validator.ValidatorFactoryUtils;
+import org.clever.storage.dto.request.FileUploadLazyReq;
 import org.clever.storage.dto.request.UploadFileReq;
 import org.clever.storage.dto.response.UploadFilesRes;
+import org.clever.storage.entity.EnumConstant;
 import org.clever.storage.entity.FileInfo;
 import org.clever.storage.utils.FileUploadUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,7 +20,11 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
 
 import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.io.OutputStream;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * 作者：LiZW <br/>
@@ -38,9 +46,13 @@ public class ManageStorageService {
         UploadFileReq uploadFileReq = new UploadFileReq();
         uploadFileReq.setFileSource(request.getParameter("fileSource"));
         // 是否公开可以修改(0不是，1是)
-        uploadFileReq.setPublicWrite(NumberUtils.toInt(request.getParameter("publicWrite"), 0));
+        uploadFileReq.setPublicWrite(NumberUtils.toInt(request.getParameter("publicWrite"), EnumConstant.PublicWrite_0));
         // 是否公开可以访问(0不是，1是)
-        uploadFileReq.setPublicRead(NumberUtils.toInt(request.getParameter("publicRead"), 1));
+        uploadFileReq.setPublicRead(NumberUtils.toInt(request.getParameter("publicRead"), EnumConstant.PublicWrite_1));
+        // 目前只支持 (公开可读-私有写) 和 (私有读-私有写) 两种模式
+        if (!Objects.equals(EnumConstant.PublicWrite_0, uploadFileReq.getPublicWrite())) {
+            throw new BusinessException("只支持私有写(publicWrite=0)");
+        }
         // 校验请求数据
         BaseValidatorUtils.validateThrowException(ValidatorFactoryUtils.getHibernateValidator(), uploadFileReq);
         return uploadFileReq;
@@ -100,56 +112,66 @@ public class ManageStorageService {
         return uploadFilesRes;
     }
 
-//    /**
-//     * 通过文件签名实现文件秒传，只能一次上传一个文件<br/>
-//     *
-//     * @return 失败返回null, 务必调用 message.setResult(fileInfo)
-//     */
-//    public static FileInfo uploadLazy(IStorageService storageService, HttpServletRequest request, HttpServletResponse response, FileUploadLazyVo fileUploadLazyVo, AjaxMessage message) {
-//        // 验证是否是Hex编码
-//        String fileDigest = fileUploadLazyVo.getFileDigest().toLowerCase();
-//        if (!EncodeDecodeUtils.isHexcode(fileDigest)) {
-//            message.setSuccess(false);
-//            message.setFailMessage("文件签名必须使用Hex编码");
-//            return null;
+    /**
+     * 通过文件签名实现文件秒传，只能一次上传一个文件<br/>
+     *
+     * @return 失败返回null, 务必调用 message.setResult(fileInfo)
+     */
+    @Transactional
+    public FileInfo uploadLazy(FileUploadLazyReq fileUploadLazyReq) {
+        // 验证是否是Hex编码
+        String fileDigest = fileUploadLazyReq.getFileDigest().toLowerCase();
+        if (!EncodeDecodeUtils.isHexCode(fileDigest)) {
+            throw new BusinessException("文件签名必须使用Hex编码");
+        }
+        // 验证文件签名长度
+        if (Objects.equals(EnumConstant.DigestType_1, fileUploadLazyReq.getDigestType())) {
+            // 验证长度MD5 长度为：32
+            if (fileDigest.length() != 32) {
+                throw new BusinessException("文件签名长度不正确(MD5签名长度32，SHA1签名长度40)");
+            }
+        } else if (Objects.equals(EnumConstant.DigestType_2, fileUploadLazyReq.getDigestType())) {
+            // 验证长度SHA1 长度为：40
+            if (fileDigest.length() != 40) {
+                throw new BusinessException("文件签名长度不正确(MD5签名长度32，SHA1签名长度40)");
+            }
+        } else {
+            throw new BusinessException("不支持的文件签名类型");
+        }
+        UploadFileReq uploadFileReq = BeanMapper.mapper(fileUploadLazyReq, UploadFileReq.class);
+        // 目前只支持 (公开可读-私有写) 和 (私有读-私有写) 两种模式
+        if (!Objects.equals(EnumConstant.PublicWrite_0, uploadFileReq.getPublicWrite())) {
+            throw new BusinessException("只支持私有写(publicWrite=0)");
+        }
+        // 验证通过
+        FileInfo fileInfo = storageService.lazySaveFile(
+                uploadFileReq,
+                0L,
+                fileUploadLazyReq.getFileName(),
+                fileUploadLazyReq.getFileDigest(),
+                fileUploadLazyReq.getDigestType()
+        );
+        if (fileInfo == null) {
+            throw new BusinessException("文件秒传失败，该文件从未上传过");
+        }
+        return fileInfo;
+    }
+
+    public void openFile(HttpServletRequest request, HttpServletResponse response, String newName) throws IOException {
+        FileInfo fileInfo = storageService.getFileInfo(newName);
+        if (fileInfo == null) {
+            // 404
+        }
+        // 文件存在，下载文件
+        response.setContentType("multipart/form-data");
+        String fileName = EncodeDecodeUtils.browserDownloadFileName(request.getHeader("User-Agent"), fileInfo.getFileName());
+        response.setHeader("Content-Disposition", "attachment;fileName=" + fileName);
+        response.setHeader("Content-Length", fileInfo.getFileSize().toString());
+        OutputStream outputStream = response.getOutputStream();
+//        fileInfo = storageService.openFileSpeedLimit(downloadFileVo.getUuid(), outputStream, -1);
+//        // outputStream.close(); //Servlet容器会关闭
+//        if (fileInfo != null) {
+//            log.info("文件下载成功, 文件NewName={}", fileInfo.getNewName());
 //        }
-//        Character digestType;
-//        // 验证文件签名长度
-//        if (FileInfo.MD5_DIGEST.toString().equals(fileUploadLazyVo.getDigestType())) {
-//            digestType = FileInfo.MD5_DIGEST;
-//            // 验证长度MD5 长度为：32
-//            if (fileDigest.length() != 32) {
-//                message.setSuccess(false);
-//                message.setFailMessage("文件签名长度不正确(MD5签名长度32，SHA1签名长度40)");
-//                return null;
-//            }
-//        } else if (FileInfo.SHA1_DIGEST.toString().equals(fileUploadLazyVo.getDigestType())) {
-//            digestType = FileInfo.SHA1_DIGEST;
-//            // 验证长度SHA1 长度为：40
-//            if (fileDigest.length() != 40) {
-//                message.setSuccess(false);
-//                message.setFailMessage("文件签名长度不正确(MD5签名长度32，SHA1签名长度40)");
-//                return null;
-//            }
-//        } else {
-//            message.setSuccess(false);
-//            message.setFailMessage("不支持的文件签名：" + fileUploadLazyVo.getDigestType());
-//            return null;
-//        }
-//        // 验证通过
-//        FileInfo fileInfo = null;
-//        try {
-//            fileInfo = storageService.lazySaveFile(fileUploadLazyVo.getFileName(), fileUploadLazyVo.getFileDigest(), digestType);
-//        } catch (Throwable e) {
-//            message.setSuccess(false);
-//            message.setFailMessage("上传文件失败，系统异常");
-//            message.setException(e);
-//        }
-//        if (fileInfo == null) {
-//            message.setSuccess(false);
-//            message.setFailMessage("文件秒传失败，该文件从未上传过");
-//            return null;
-//        }
-//        return fileInfo;
-//    }
+    }
 }

@@ -17,4 +17,7 @@ public interface FileInfoMapper extends BaseMapper<FileInfo> {
 
     @Select("select * from file_info where digest=#{digest} and digest_type=#{digestType} limit 1")
     FileInfo getFileInfoByDigest(@Param("digest") String digest, @Param("digestType") Integer digestType);
+
+    @Select("select * from file_info where new_name=#{newName} limit 1")
+    FileInfo getByNewName(@Param("newName") String newName);
 }

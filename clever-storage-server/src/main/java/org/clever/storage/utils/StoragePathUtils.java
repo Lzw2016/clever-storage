@@ -1,6 +1,9 @@
 package org.clever.storage.utils;
 
+import org.apache.commons.io.FilenameUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.clever.common.utils.DateTimeUtils;
+import org.clever.common.utils.IDCreateUtils;
 
 import java.io.File;
 
@@ -27,6 +30,20 @@ public class StoragePathUtils {
                 array[0] + "-" + array[1] +
                 File.separator +
                 dateStr;
+    }
+
+    /**
+     * 生成新文件名
+     *
+     * @param fileName 上传文件名
+     */
+    public static String generateNewFileName(String fileName) {
+        String newName = IDCreateUtils.uuid();
+        String fileExtension = FilenameUtils.getExtension(fileName);
+        if (StringUtils.isNotBlank(fileExtension)) {
+            newName = newName + "." + fileExtension.toLowerCase();
+        }
+        return newName;
     }
 }
 

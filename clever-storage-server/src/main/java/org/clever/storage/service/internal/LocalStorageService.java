@@ -4,8 +4,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.clever.common.server.service.BaseService;
-import org.clever.common.utils.IDCreateUtils;
 import org.clever.common.utils.IPAddressUtils;
+import org.clever.common.utils.mapper.BeanMapper;
 import org.clever.storage.config.GlobalConfig;
 import org.clever.storage.dto.request.UploadFileReq;
 import org.clever.storage.entity.EnumConstant;
@@ -21,6 +21,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
 import java.io.InputStream;
+import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -32,6 +33,9 @@ import java.util.Set;
 @Component("LocalStorageService")
 @Slf4j
 public class LocalStorageService extends BaseService implements IStorageService {
+
+    private static final String publicReadBasePath = File.separator + "public-read";
+    private static final String privateReadBasePath = File.separator + "private-read";
 
     /**
      * 上传文件存储到当前服务器的路径，如：F:\fileStoragePath<br>
@@ -72,7 +76,7 @@ public class LocalStorageService extends BaseService implements IStorageService 
     }
 
     @Override
-    public FileInfo lazySaveFile(String fileName, String digest, Integer digestType) {
+    public FileInfo lazySaveFile(UploadFileReq uploadFileReq, long uploadTime, String fileName, String digest, Integer digestType) {
         if (StringUtils.isBlank(digest) || digestType == null) {
             return null;
         }
@@ -92,9 +96,22 @@ public class LocalStorageService extends BaseService implements IStorageService 
             log.warn("[本地服务器]秒传失败，上传文件不存在(可能已经被删除)，文件路径[{}]", filepath);
             return null;
         }
-        // TODO 需要新增记录？
+        // 需要新增记录
+        FileInfo newFileInfo = BeanMapper.mapper(dbFileInfo, FileInfo.class);
+        newFileInfo.setId(null);
+        newFileInfo.setUpdateAt(null);
+        newFileInfo.setCreateAt(null);
+        newFileInfo.setPublicRead(uploadFileReq.getPublicRead());
+        newFileInfo.setPublicWrite(uploadFileReq.getPublicWrite());
+        newFileInfo.setFileSource(uploadFileReq.getFileSource());
+        newFileInfo.setUploadTime(uploadTime);
+        newFileInfo.setFileName(fileName);
+        newFileInfo.setStoredTime(0L);
+        // TODO 私有读 -> 公开可读(需要转移文件)
+        //newFileInfo.setNewName(StoragePathUtils.generateNewFileName(fileName));
+        fileInfoMapper.insert(newFileInfo);
         log.info("[本地服务器]文件秒传成功，文件存储路径[{}]", filepath);
-        return dbFileInfo;
+        return newFileInfo;
     }
 
     @Override
@@ -105,7 +122,7 @@ public class LocalStorageService extends BaseService implements IStorageService 
             digest = FileDigestUtils.FileDigestByMD5(inputStream);
         }
         // 通过文件签名检查服务器端是否有相同文件
-        FileInfo lazyFileInfo = this.lazySaveFile(multipartFile.getOriginalFilename(), digest, EnumConstant.DigestType_1);
+        FileInfo lazyFileInfo = this.lazySaveFile(uploadFileReq, uploadTime, multipartFile.getOriginalFilename(), digest, EnumConstant.DigestType_1);
         if (lazyFileInfo != null) {
             return lazyFileInfo;
         }
@@ -122,14 +139,11 @@ public class LocalStorageService extends BaseService implements IStorageService 
         fileInfo.setStoredType(EnumConstant.StoredType_1);
         fileInfo.setStoredNode(storedNode);
         // 设置文件存储之后的名称：UUID + 后缀名(此操作依赖文件原名称)
-        String newName = IDCreateUtils.uuid();
-        String fileExtension = FilenameUtils.getExtension(fileInfo.getFileName());
-        if (StringUtils.isNotBlank(fileExtension)) {
-            newName = newName + "." + fileExtension.toLowerCase();
-        }
+        String newName = StoragePathUtils.generateNewFileName(fileInfo.getFileName());
         fileInfo.setNewName(newName);
         // 上传文件存储到当前服务器的路径(相对路径，相对于 FILE_STORAGE_PATH)
-        String filePath = StoragePathUtils.generateFilePathByDate("");
+        String basePath = Objects.equals(EnumConstant.PublicRead_1, fileInfo.getPublicRead()) ? publicReadBasePath : privateReadBasePath;
+        String filePath = StoragePathUtils.generateFilePathByDate(basePath);
         fileInfo.setFilePath(filePath);
         // 计算文件的绝对路径，保存文件
         String absoluteFilePath = diskBasePath + filePath + File.separator + newName;
@@ -150,6 +164,10 @@ public class LocalStorageService extends BaseService implements IStorageService 
         // 设置存储所用的时间
         fileInfo.setStoredTime(storageEnd - storageStart);
         log.info("[本地服务器]文件存储所用时间:[{}ms]", fileInfo.getStoredTime());
+        // TODO 设置公开可读的Url
+//        if (Objects.equals(EnumConstant.PublicRead_1, fileInfo.getPublicRead())) {
+//            fileInfo.setReadUrl("");
+//        }
         // 保存文件信息
         fileInfoMapper.insert(fileInfo);
         return fileInfo;
@@ -184,21 +202,21 @@ public class LocalStorageService extends BaseService implements IStorageService 
 //        return 1;
 //    }
 
-//    @Override
-//    public FileInfo isExists(Serializable fileInfoUuid) throws Exception {
-//        FileInfo fileInfo = fileInfoDao.getFileInfoByUuid(fileInfoUuid);
-//        if (fileInfo == null) {
-//            return null;
-//        }
-//        String fullPath = FILE_STORAGE_PATH + fileInfo.getFilePath();
-//        fullPath = FilenameUtils.concat(fullPath, fileInfo.getNewName());
-//        File file = new File(fullPath);
-//        if (file.exists() && file.isFile()) {
-//            return fileInfo;
-//        }
-//        logger.warn("[本地服务器]文件引用[UUID={}]对应的文件不存在", fileInfo.getUuid());
-//        return null;
-//    }
+    @Override
+    public FileInfo getFileInfo(String newName) {
+        FileInfo fileInfo = fileInfoMapper.getByNewName(newName);
+        if (fileInfo == null) {
+            return null;
+        }
+        String fullPath = diskBasePath + fileInfo.getFilePath();
+        fullPath = FilenameUtils.concat(fullPath, fileInfo.getNewName());
+        File file = new File(fullPath);
+        if (file.exists() && file.isFile()) {
+            return fileInfo;
+        }
+        log.warn("[本地服务器]文件引用[NewName={}]对应的文件不存在", fileInfo.getNewName());
+        return null;
+    }
 
 //    @Override
 //    public FileInfo openFile(Serializable fileInfoUuid, OutputStream outputStream) throws Exception {

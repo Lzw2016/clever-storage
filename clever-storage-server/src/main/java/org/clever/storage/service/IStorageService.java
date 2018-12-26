@@ -15,12 +15,14 @@ public interface IStorageService {
     /**
      * 根据文件签名保存文件，实现文件秒传<br>
      *
-     * @param fileName   文件名称
-     * @param digest     文件签名
-     * @param digestType 签名类型
+     * @param uploadFileReq 请求上传参数
+     * @param uploadTime    文件上传所用时间
+     * @param fileName      文件名称
+     * @param digest        文件签名
+     * @param digestType    签名类型
      * @return 保存成功返回文件信息，失败返回null
      */
-    FileInfo lazySaveFile(String fileName, String digest, Integer digestType);
+    FileInfo lazySaveFile(UploadFileReq uploadFileReq, long uploadTime, String fileName, String digest, Integer digestType);
 
     /**
      * 保存文件，当文件较大时此方法会占用磁盘IO，因为common-fileupload会将上传文件写入硬盘的临时文件<br>
@@ -44,15 +46,13 @@ public interface IStorageService {
 //     */
 //    int deleteFile(String newName, boolean lazy);
 
-//    /**
-//     * 判断文件在服务端是否存在<br>
-//     * <p>
-//     * <b>注意：此方法的返回值与数据库中是否存在fileInfo无关系</b>
-//     *
-//     * @param newName 文件名称
-//     * @return 不存在返回null，存在返回文件信息
-//     */
-//    FileInfo isExists(String newName);
+    /**
+     * 判断文件在服务端是否存在(数据库存在文件信息且文件存在硬盘)<br>
+     *
+     * @param newName 文件名称
+     * @return 不存在返回null，存在返回文件信息
+     */
+    FileInfo getFileInfo(String newName);
 
 //    /**
 //     * 打开文件到OutputStream<br>
