@@ -1,6 +1,7 @@
 package org.clever.storage.service;
 
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang3.math.NumberUtils;
 import org.clever.common.exception.BusinessException;
 import org.clever.common.utils.codec.EncodeDecodeUtils;
@@ -13,6 +14,7 @@ import org.clever.storage.dto.request.UploadFileReq;
 import org.clever.storage.dto.response.UploadFilesRes;
 import org.clever.storage.entity.EnumConstant;
 import org.clever.storage.entity.FileInfo;
+import org.clever.storage.utils.ContentTypeUtils;
 import org.clever.storage.utils.FileUploadUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -25,6 +27,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Function;
 
 /**
  * 作者：LiZW <br/>
@@ -35,6 +38,7 @@ import java.util.Objects;
 public class ManageStorageService {
 
     @Autowired
+    // @Qualifier("LocalStorageService")
     private IStorageService storageService;
 
     /**
@@ -144,17 +148,15 @@ public class ManageStorageService {
         return fileInfo;
     }
 
-    public void openFile(HttpServletRequest request, HttpServletResponse response, String newName) {
+    /**
+     * 读取文件
+     */
+    private void readFile(HttpServletResponse response, String newName, Function<FileInfo, Void> function) {
         FileInfo fileInfo = storageService.getFileInfo(newName);
         if (fileInfo == null) {
-            // 404
-            return;
+            throw new BusinessException("文件不存在", 404);
         }
-        // 文件存在，下载文件
-        String fileName = EncodeDecodeUtils.browserDownloadFileName(request.getHeader("User-Agent"), fileInfo.getFileName());
-        response.setContentType("multipart/form-data");
-        response.setHeader("Content-Disposition", "attachment;fileName=" + fileName);
-        response.setHeader("Content-Length", fileInfo.getFileSize().toString());
+        function.apply(fileInfo);
         try {
             OutputStream outputStream = response.getOutputStream();
             storageService.openFileSpeedLimit(fileInfo, outputStream, -1);
@@ -163,5 +165,24 @@ public class ManageStorageService {
         } catch (IOException e) {
             throw ExceptionUtils.unchecked(e);
         }
+    }
+
+    public void openFile(HttpServletResponse response, String newName) {
+        readFile(response, newName, fileInfo -> {
+            response.setContentType(ContentTypeUtils.getContentType(FilenameUtils.getExtension(fileInfo.getFileName())));
+            response.setHeader("Content-Length", fileInfo.getFileSize().toString());
+            return null;
+        });
+    }
+
+    public void download(HttpServletRequest request, HttpServletResponse response, String newName) {
+        readFile(response, newName, fileInfo -> {
+            // 文件存在，下载文件
+            String fileName = EncodeDecodeUtils.browserDownloadFileName(request.getHeader("User-Agent"), fileInfo.getFileName());
+            response.setContentType("application/octet-stream");
+            response.setHeader("Content-Disposition", "attachment;fileName=" + fileName);
+            response.setHeader("Content-Length", fileInfo.getFileSize().toString());
+            return null;
+        });
     }
 }

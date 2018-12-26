@@ -38,10 +38,4 @@ public class FileuploadController {
     public FileInfo uploadLazy(@RequestBody @Validated FileUploadLazyReq fileUploadLazyReq) {
         return manageStorageService.uploadLazy(fileUploadLazyReq);
     }
-
-    @ApiOperation("根据文件UUID，下载文件")
-    @GetMapping("/download/{newName}")
-    public void download(HttpServletRequest request, HttpServletResponse response, @PathVariable String newName) {
-        manageStorageService.openFile(request, response, newName);
-    }
 }
