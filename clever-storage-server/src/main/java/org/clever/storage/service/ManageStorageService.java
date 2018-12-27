@@ -155,7 +155,7 @@ public class ManageStorageService {
     /**
      * 读取文件
      */
-    private void readFile(HttpServletResponse response, String newName, Function<FileInfo, Void> function) {
+    private void readFile(boolean speedLimit, HttpServletResponse response, String newName, Function<FileInfo, Void> function) {
         FileInfo fileInfo = storageService.getFileInfo(newName);
         if (fileInfo == null) {
             throw new BusinessException("文件不存在", 404);
@@ -163,7 +163,11 @@ public class ManageStorageService {
         function.apply(fileInfo);
         try {
             OutputStream outputStream = response.getOutputStream();
-            storageService.openFileSpeedLimit(fileInfo, outputStream, globalConfig.getDownloadSpeedLimit());
+            if (speedLimit) {
+                storageService.openFileSpeedLimit(fileInfo, outputStream, globalConfig.getDownloadSpeedLimit());
+            } else {
+                storageService.openFile(fileInfo, outputStream);
+            }
             outputStream.flush();
             log.info("文件下载成功, 文件NewName={}", fileInfo.getNewName());
         } catch (IOException e) {
@@ -171,21 +175,16 @@ public class ManageStorageService {
         }
     }
 
-    public void openFile(HttpServletResponse response, String newName) {
-        readFile(response, newName, fileInfo -> {
+    public void openFile(boolean speedLimit, HttpServletResponse response, String newName) {
+        readFile(speedLimit, response, newName, fileInfo -> {
             response.setHeader("Content-Length", fileInfo.getFileSize().toString());
             ContentTypeUtils.setContentTypeNoCharset(response, ContentTypeUtils.getContentType(FilenameUtils.getExtension(fileInfo.getFileName())));
             return null;
         });
-//        //Servlet容器会关闭
-//        try {
-//            response.getOutputStream().close();
-//        } catch (IOException ignored) {
-//        }
     }
 
-    public void download(HttpServletRequest request, HttpServletResponse response, String newName) {
-        readFile(response, newName, fileInfo -> {
+    public void download(boolean speedLimit, HttpServletRequest request, HttpServletResponse response, String newName) {
+        readFile(speedLimit, response, newName, fileInfo -> {
             // 文件存在，下载文件
             String fileName = EncodeDecodeUtils.browserDownloadFileName(request.getHeader("User-Agent"), fileInfo.getFileName());
             response.setHeader("Content-Disposition", "attachment;fileName=" + fileName);
@@ -193,5 +192,13 @@ public class ManageStorageService {
             ContentTypeUtils.setContentTypeNoCharset(response, "application/octet-stream");
             return null;
         });
+    }
+
+    public FileInfo getFileInfo(Long fileId) {
+        return storageService.getFileInfo(fileId);
+    }
+
+    public FileInfo deleteFile(Long fileId) {
+        return storageService.deleteFile(fileId);
     }
 }

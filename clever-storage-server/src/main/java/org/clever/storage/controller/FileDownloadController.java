@@ -27,15 +27,20 @@ public class FileDownloadController {
     private ManageStorageService manageStorageService;
 
     @ApiOperation("根据文件newName打开文件")
-    @GetMapping("/openFile/{newName}")
-    public void openFile(HttpServletResponse response, @PathVariable String newName) {
-        manageStorageService.openFile(response, newName);
+    @GetMapping("/open_speed_limit/{newName}")
+    public void openFileSpeedLimit(HttpServletResponse response, @PathVariable String newName) {
+        manageStorageService.openFile(true, response, newName);
+    }
+
+    @ApiOperation("根据文件newName，下载文件")
+    @GetMapping("/download_speed_limit/{newName}")
+    public void downloadSpeedLimit(HttpServletRequest request, HttpServletResponse response, @PathVariable String newName) {
+        manageStorageService.download(true, request, response, newName);
     }
 
     @ApiOperation("根据文件newName，下载文件")
     @GetMapping("/download/{newName}")
     public void download(HttpServletRequest request, HttpServletResponse response, @PathVariable String newName) {
-        manageStorageService.download(request, response, newName);
+        manageStorageService.download(false, request, response, newName);
     }
-
 }

@@ -45,14 +45,10 @@ public interface IStorageService {
      */
     FileInfo saveFile(UploadFileReq uploadFileReq, long uploadTime, MultipartFile multipartFile) throws Exception;
 
-//    /**
-//     * 删除服务器端的文件<br>
-//     *
-//     * @param newName 文件信息UUID
-//     * @param lazy    如果值为true表示：只删除当前文件引用；值为false表示：直接从硬盘中删除服务器端文件
-//     * @return 1：成功删除fileInfo和服务器端文件；2：只删除了fileInfo；3：fileInfo不存在
-//     */
-//    int deleteFile(String newName, boolean lazy);
+    /**
+     * 判断文件在服务端是否存在<br>
+     */
+    boolean isExists(FileInfo fileInfo);
 
     /**
      * 判断文件在服务端是否存在(数据库存在文件信息且文件存在硬盘)<br>
@@ -62,15 +58,22 @@ public interface IStorageService {
      */
     FileInfo getFileInfo(String newName);
 
-//    /**
-//     * 打开文件到OutputStream<br>
-//     *
-//     * @param fileInfoUuid 文件信息UUID
-//     * @param outputStream 输出流，用于打开文件
-//     * @return FileInfo(文件信息)。 文件不存在返回null
-//     * @throws Exception 操作失败
-//     */
-//    FileInfo openFile(Serializable fileInfoUuid, OutputStream outputStream) throws Exception;
+    /**
+     * 判断文件在服务端是否存在(数据库存在文件信息且文件存在硬盘)<br>
+     *
+     * @param fileId 文件ID
+     * @return 不存在返回null，存在返回文件信息
+     */
+    FileInfo getFileInfo(Long fileId);
+
+    /**
+     * 打开文件到OutputStream<br>
+     *
+     * @param fileInfo     文件信息
+     * @param outputStream 输出流，用于打开文件
+     * @throws IOException 操作失败
+     */
+    void openFile(FileInfo fileInfo, OutputStream outputStream) throws IOException;
 
     /**
      * 打开文件到OutputStream(限制打开文件速度，适用于客户端下载文件) 可以控制打开速度<br>
@@ -82,5 +85,12 @@ public interface IStorageService {
      * @throws IOException 操作失败
      */
     void openFileSpeedLimit(FileInfo fileInfo, OutputStream outputStream, long maxSpeed) throws IOException;
+
+    /**
+     * 删除文件<br>
+     *
+     * @param fileId 文件ID
+     */
+    FileInfo deleteFile(Long fileId);
 }
 

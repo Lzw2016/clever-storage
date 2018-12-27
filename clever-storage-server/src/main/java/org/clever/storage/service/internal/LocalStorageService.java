@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.clever.common.exception.BusinessException;
 import org.clever.common.server.service.BaseService;
 import org.clever.common.utils.IPAddressUtils;
 import org.clever.common.utils.mapper.BeanMapper;
@@ -182,73 +183,53 @@ public class LocalStorageService extends BaseService implements IStorageService 
         return fileInfo;
     }
 
-//    @Transactional(readOnly = false)
-//    @Override
-//    public int deleteFile(Serializable fileInfoUuid, boolean lazy) throws Exception {
-//        // 1：成功删除fileInfo和服务器端文件；2：只删除了fileInfo；3：fileInfo不存在
-//        FileInfo fileInfo = fileInfoDao.getFileInfoByUuid(fileInfoUuid);
-//        if (fileInfo == null) {
-//            // FileInfo 不存在或已经被删除
-//            return 3;
-//        }
-//        int count = fileInfoDao.deleteFileInfo(fileInfo.getFilePath(), fileInfo.getNewName());
-//        logger.info("[本地服务器]删除文件引用数量：{} 条", count);
-//        if (lazy) {
-//            // lazy == true:只删除FileInfo
-//            return 2;
-//        }
-//        String fullPath = FILE_STORAGE_PATH + fileInfo.getFilePath();
-//        fullPath = FilenameUtils.concat(fullPath, fileInfo.getNewName());
-//        File file = new File(fullPath);
-//        if (file.exists() && file.isFile()) {
-//            if (!file.delete()) {
-//                throw new Exception("[本地服务器]文件删除失败：" + fullPath);
-//            }
-//        } else {
-//            throw new Exception("[本地服务器]文件删除失败：" + fullPath);
-//        }
-//        logger.warn("[本地服务器]删除文件成功，文件路径[{}]", fullPath);
-//        return 1;
-//    }
-
     @Override
-    public FileInfo getFileInfo(String newName) {
-        FileInfo fileInfo = fileInfoMapper.getByNewName(newName);
+    public boolean isExists(FileInfo fileInfo) {
         if (fileInfo == null) {
-            return null;
+            return false;
         }
         String fullPath = diskBasePath + fileInfo.getFilePath();
         fullPath = FilenameUtils.concat(fullPath, fileInfo.getNewName());
         File file = new File(fullPath);
         if (file.exists() && file.isFile()) {
-            return fileInfo;
+            return true;
         }
         log.warn("[本地服务器]文件引用[NewName={}]对应的文件不存在", fileInfo.getNewName());
-        return null;
+        return false;
     }
 
-//    @Override
-//    public FileInfo openFile(Serializable fileInfoUuid, OutputStream outputStream) throws Exception {
-//        FileInfo fileInfo = fileInfoDao.getFileInfoByUuid(fileInfoUuid);
-//        if (fileInfo == null) {
-//            return null;
-//        }
-//        String fullPath = FILE_STORAGE_PATH + fileInfo.getFilePath();
-//        fullPath = FilenameUtils.concat(fullPath, fileInfo.getNewName());
-//        File file = new File(fullPath);
-//        if (file.exists() && file.isFile()) {
-//            try (InputStream inputStream = FileUtils.openInputStream(file)) {
-//                byte[] data = new byte[256 * 1024];
-//                while (inputStream.read(data) > -1) {
-//                    outputStream.write(data);
-//                }
-//                outputStream.flush();
-//            }
-//            return fileInfo;
-//        }
-//        logger.warn("[本地服务器]文件引用[UUID={}]对应的文件不存在", fileInfo.getUuid());
-//        return null;
-//    }
+    @Override
+    public FileInfo getFileInfo(String newName) {
+        FileInfo fileInfo = fileInfoMapper.getByNewName(newName);
+        return isExists(fileInfo) ? fileInfo : null;
+    }
+
+    @Override
+    public FileInfo getFileInfo(Long fileId) {
+        FileInfo fileInfo = fileInfoMapper.selectById(fileId);
+        return isExists(fileInfo) ? fileInfo : null;
+    }
+
+    @Transactional(propagation = Propagation.NEVER)
+    @Override
+    public void openFile(FileInfo fileInfo, OutputStream outputStream) throws IOException {
+        if (fileInfo == null) {
+            throw new IllegalArgumentException("文件信息不能为空");
+        }
+        if (!isExists(fileInfo)) {
+            throw new BusinessException("文件不存在", 404);
+        }
+        String fullPath = diskBasePath + fileInfo.getFilePath();
+        fullPath = FilenameUtils.concat(fullPath, fileInfo.getNewName());
+        File file = new File(fullPath);
+        try (InputStream inputStream = FileUtils.openInputStream(file)) {
+            byte[] data = new byte[8 * 1024];
+            while (inputStream.read(data) > -1) {
+                outputStream.write(data);
+            }
+            outputStream.flush();
+        }
+    }
 
     @SuppressWarnings("UnstableApiUsage")
     @Transactional(propagation = Propagation.NEVER)
@@ -257,6 +238,9 @@ public class LocalStorageService extends BaseService implements IStorageService 
         if (fileInfo == null) {
             throw new IllegalArgumentException("文件信息不能为空");
         }
+        if (!isExists(fileInfo)) {
+            throw new BusinessException("文件不存在", 404);
+        }
         if (maxSpeed <= 0) {
             maxSpeed = Max_Open_Speed;
         }
@@ -264,25 +248,42 @@ public class LocalStorageService extends BaseService implements IStorageService 
         String fullPath = diskBasePath + fileInfo.getFilePath();
         fullPath = FilenameUtils.concat(fullPath, fileInfo.getNewName());
         File file = new File(fullPath);
-        if (file.exists() && file.isFile()) {
-            try (InputStream inputStream = FileUtils.openInputStream(file)) {
-                byte[] data = new byte[32 * 1024];
-                int readByte;
-                double sleepTime;
-                while (true) {
-                    readByte = inputStream.read(data);
-                    if (readByte <= 0) {
-                        break;
-                    }
-                    outputStream.write(data);
-                    sleepTime = rateLimiter.acquire(readByte);
-                    log.debug("[本地服务器]打开文件NewName:[{}], 读取字节数:[{}], 休眠时间:[{}]秒", fileInfo.getNewName(), readByte, sleepTime);
+        try (InputStream inputStream = FileUtils.openInputStream(file)) {
+            byte[] data = new byte[8 * 1024];
+            int readByte;
+            double sleepTime;
+            while (true) {
+                readByte = inputStream.read(data);
+                if (readByte <= 0) {
+                    break;
                 }
-                outputStream.flush();
+                outputStream.write(data);
+                sleepTime = rateLimiter.acquire(readByte);
+                log.debug("[本地服务器]打开文件NewName:[{}], 读取字节数:[{}], 休眠时间:[{}]秒", fileInfo.getNewName(), readByte, sleepTime);
             }
-            return;
+            outputStream.flush();
         }
-        log.warn("[本地服务器]文件引用[NewName={}]对应的文件不存在", fileInfo.getNewName());
+    }
+
+    @Transactional
+    @Override
+    public FileInfo deleteFile(Long fileId) {
+        FileInfo fileInfo = fileInfoMapper.selectById(fileId);
+        if (fileInfo == null) {
+            throw new BusinessException("文件不存在");
+        }
+        fileInfoMapper.deleteById(fileId);
+        FileInfo other = fileInfoMapper.getFileInfoByDigest(fileInfo.getDigest(), fileInfo.getDigestType());
+        if (other == null && isExists(fileInfo)) {
+            // 彻底删除文件
+            String fullPath = diskBasePath + fileInfo.getFilePath();
+            fullPath = FilenameUtils.concat(fullPath, fileInfo.getNewName());
+            File file = new File(fullPath);
+            if (!file.delete()) {
+                throw new BusinessException("[本地服务器]文件删除失败：" + fullPath);
+            }
+        }
+        return fileInfo;
     }
 }
 
