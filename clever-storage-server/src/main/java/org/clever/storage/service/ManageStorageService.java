@@ -160,7 +160,7 @@ public class ManageStorageService {
         try {
             OutputStream outputStream = response.getOutputStream();
             storageService.openFileSpeedLimit(fileInfo, outputStream, -1);
-            // outputStream.close(); //Servlet容器会关闭
+            outputStream.flush();
             log.info("文件下载成功, 文件NewName={}", fileInfo.getNewName());
         } catch (IOException e) {
             throw ExceptionUtils.unchecked(e);
@@ -169,19 +169,24 @@ public class ManageStorageService {
 
     public void openFile(HttpServletResponse response, String newName) {
         readFile(response, newName, fileInfo -> {
-            response.setContentType(ContentTypeUtils.getContentType(FilenameUtils.getExtension(fileInfo.getFileName())));
             response.setHeader("Content-Length", fileInfo.getFileSize().toString());
+            ContentTypeUtils.setContentTypeNoCharset(response, ContentTypeUtils.getContentType(FilenameUtils.getExtension(fileInfo.getFileName())));
             return null;
         });
+        //Servlet容器会关闭
+        try {
+            response.getOutputStream().close();
+        } catch (IOException ignored) {
+        }
     }
 
     public void download(HttpServletRequest request, HttpServletResponse response, String newName) {
         readFile(response, newName, fileInfo -> {
             // 文件存在，下载文件
             String fileName = EncodeDecodeUtils.browserDownloadFileName(request.getHeader("User-Agent"), fileInfo.getFileName());
-            response.setContentType("application/octet-stream");
             response.setHeader("Content-Disposition", "attachment;fileName=" + fileName);
             response.setHeader("Content-Length", fileInfo.getFileSize().toString());
+            ContentTypeUtils.setContentTypeNoCharset(response, "application/octet-stream");
             return null;
         });
     }

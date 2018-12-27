@@ -1,7 +1,10 @@
 package org.clever.storage.utils;
 
 import org.apache.commons.lang3.StringUtils;
+import org.clever.common.exception.BusinessException;
+import org.clever.common.utils.reflection.ReflectionsUtils;
 
+import javax.servlet.http.HttpServletResponse;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -332,6 +335,7 @@ public class ContentTypeUtils {
         put(".xdr", "text/xml");
         put(".xfdf", "application/vnd.adobe.xfdf");
         put(".xls", "application/vnd.ms-excel");
+        put(".xlsx", "application/vnd.ms-excel");
         put(".xlw", "application/x-xlw");
         put(".xpl", "audio/scpls");
         put(".xql", "text/xml");
@@ -360,6 +364,27 @@ public class ContentTypeUtils {
             return Default;
         }
         return contentType;
+    }
+
+    public static void setContentTypeNoCharset(HttpServletResponse response, String contentType) {
+        boolean flag = false;
+        if (response instanceof org.apache.catalina.connector.ResponseFacade) {
+            org.apache.catalina.connector.ResponseFacade responseFacade = (org.apache.catalina.connector.ResponseFacade) response;
+            Object object = ReflectionsUtils.getFieldValue(responseFacade, "response");
+            if (object instanceof org.apache.catalina.connector.Response) {
+                org.apache.catalina.connector.Response connectorResponse = (org.apache.catalina.connector.Response) object;
+                object = ReflectionsUtils.getFieldValue(connectorResponse, "coyoteResponse");
+                if (object instanceof org.apache.coyote.Response) {
+                    org.apache.coyote.Response coyoteResponse = (org.apache.coyote.Response) object;
+                    coyoteResponse.setContentTypeNoCharset(contentType);
+                    ReflectionsUtils.setFieldValue(coyoteResponse, "charset", null);
+                    flag = true;
+                }
+            }
+        }
+        if (!flag) {
+            throw new BusinessException("setContentTypeNoCharset 异常", 500);
+        }
     }
 }
 
