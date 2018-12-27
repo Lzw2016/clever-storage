@@ -2,6 +2,7 @@ package org.clever.storage.service;
 
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.io.FilenameUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.math.NumberUtils;
 import org.clever.common.exception.BusinessException;
 import org.clever.common.utils.codec.EncodeDecodeUtils;
@@ -153,20 +154,60 @@ public class ManageStorageService {
     }
 
     /**
-     * 读取文件
+     * 读取文件(支持断点续传)
      */
-    private void readFile(boolean speedLimit, HttpServletResponse response, String newName, Function<FileInfo, Void> function) {
+    private void readFile(boolean speedLimit, HttpServletRequest request, HttpServletResponse response, String newName, Function<FileInfo, Void> function) {
         FileInfo fileInfo = storageService.getFileInfo(newName);
         if (fileInfo == null) {
             throw new BusinessException("文件不存在", 404);
         }
         function.apply(fileInfo);
+        // Range: bytes=0-499 表示第 0-499 字节范围的内容
+        // Range: bytes=500-999 表示第 500-999 字节范围的内容
+        // Range: bytes=-500 表示最后 500 字节的内容
+        // Range: bytes=500- 表示从第 500 字节开始到文件结束部分的内容
+        // Range: bytes=0-0,-1 表示第一个和最后一个字节
+        // Range: bytes=500-600,601-999 同时指定几个范围
+        String range = request.getHeader("Range");
+        // Content-Range: bytes 0-499/22400
+        // 0－499 是指当前发送的数据的范围，而 22400 则是文件的总大小
+        String ifRange = request.getHeader("If-Range");
+        // 起始位置
+        long off = -1;
+        // 读取长度
+        long len = -1;
+        if (StringUtils.isNotBlank(range) && (StringUtils.isBlank(ifRange) || Objects.equals(ifRange, fileInfo.getDigest()))) {
+            range = StringUtils.trim(range);
+            range = range.replaceAll("bytes=", "");
+            String[] tmp = range.split("-");
+            off = NumberUtils.toLong(tmp[0], -1);
+            if (tmp.length >= 2) {
+                len = NumberUtils.toLong(tmp[1], -1);
+                if (len >= off) {
+                    len = len - off + 1;
+                }
+            }
+            if (len <= 0) {
+                len = fileInfo.getFileSize() - off + 1;
+            }
+        }
+        response.setHeader("Accept-Ranges", "bytes");
+        response.setHeader("Last-Modified", String.valueOf(fileInfo.getUpdateAt() == null ? fileInfo.getCreateAt() : fileInfo.getUpdateAt()));
+        response.setHeader("Etag", fileInfo.getDigest());
+        if (off > 0 || len > 0) {
+            response.setStatus(HttpServletResponse.SC_PARTIAL_CONTENT);
+            response.setHeader("Content-Range", String.format("bytes %s-%s/%s", off, len + off - 1, fileInfo.getFileSize()));
+            response.setHeader("Content-Length", String.valueOf(len));
+        } else {
+            response.setHeader("Content-Range", String.format("%s-%s/%s", 0, fileInfo.getFileSize(), fileInfo.getFileSize()));
+            response.setHeader("Content-Length", fileInfo.getFileSize().toString());
+        }
         try {
             OutputStream outputStream = response.getOutputStream();
             if (speedLimit) {
-                storageService.openFileSpeedLimit(fileInfo, outputStream, globalConfig.getDownloadSpeedLimit());
+                storageService.openFileSpeedLimit(fileInfo, outputStream, off, len, globalConfig.getDownloadSpeedLimit());
             } else {
-                storageService.openFile(fileInfo, outputStream);
+                storageService.openFileSpeedLimit(fileInfo, outputStream, off, len, -1);
             }
             outputStream.flush();
             log.info("文件下载成功, 文件NewName={}", fileInfo.getNewName());
@@ -175,20 +216,18 @@ public class ManageStorageService {
         }
     }
 
-    public void openFile(boolean speedLimit, HttpServletResponse response, String newName) {
-        readFile(speedLimit, response, newName, fileInfo -> {
-            response.setHeader("Content-Length", fileInfo.getFileSize().toString());
+    public void openFile(boolean speedLimit, HttpServletRequest request, HttpServletResponse response, String newName) {
+        readFile(speedLimit, request, response, newName, fileInfo -> {
             ContentTypeUtils.setContentTypeNoCharset(response, ContentTypeUtils.getContentType(FilenameUtils.getExtension(fileInfo.getFileName())));
             return null;
         });
     }
 
     public void download(boolean speedLimit, HttpServletRequest request, HttpServletResponse response, String newName) {
-        readFile(speedLimit, response, newName, fileInfo -> {
+        readFile(speedLimit, request, response, newName, fileInfo -> {
             // 文件存在，下载文件
             String fileName = EncodeDecodeUtils.browserDownloadFileName(request.getHeader("User-Agent"), fileInfo.getFileName());
             response.setHeader("Content-Disposition", "attachment;fileName=" + fileName);
-            response.setHeader("Content-Length", fileInfo.getFileSize().toString());
             ContentTypeUtils.setContentTypeNoCharset(response, "application/octet-stream");
             return null;
         });

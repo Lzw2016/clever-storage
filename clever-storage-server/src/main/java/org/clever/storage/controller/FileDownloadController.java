@@ -28,8 +28,8 @@ public class FileDownloadController {
 
     @ApiOperation("根据文件newName打开文件")
     @GetMapping("/open_speed_limit/{newName}")
-    public void openFileSpeedLimit(HttpServletResponse response, @PathVariable String newName) {
-        manageStorageService.openFile(true, response, newName);
+    public void openFileSpeedLimit(HttpServletRequest request, HttpServletResponse response, @PathVariable String newName) {
+        manageStorageService.openFile(true, request, response, newName);
     }
 
     @ApiOperation("根据文件newName，下载文件")

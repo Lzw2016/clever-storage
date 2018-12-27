@@ -210,55 +210,49 @@ public class LocalStorageService extends BaseService implements IStorageService 
         return isExists(fileInfo) ? fileInfo : null;
     }
 
-    @Transactional(propagation = Propagation.NEVER)
-    @Override
-    public void openFile(FileInfo fileInfo, OutputStream outputStream) throws IOException {
-        if (fileInfo == null) {
-            throw new IllegalArgumentException("文件信息不能为空");
-        }
-        if (!isExists(fileInfo)) {
-            throw new BusinessException("文件不存在", 404);
-        }
-        String fullPath = diskBasePath + fileInfo.getFilePath();
-        fullPath = FilenameUtils.concat(fullPath, fileInfo.getNewName());
-        File file = new File(fullPath);
-        try (InputStream inputStream = FileUtils.openInputStream(file)) {
-            byte[] data = new byte[8 * 1024];
-            while (inputStream.read(data) > -1) {
-                outputStream.write(data);
-            }
-            outputStream.flush();
-        }
-    }
-
     @SuppressWarnings("UnstableApiUsage")
     @Transactional(propagation = Propagation.NEVER)
     @Override
-    public void openFileSpeedLimit(FileInfo fileInfo, OutputStream outputStream, long maxSpeed) throws IOException {
+    public void openFileSpeedLimit(FileInfo fileInfo, OutputStream outputStream, long off, long len, long maxSpeed) throws IOException {
         if (fileInfo == null) {
             throw new IllegalArgumentException("文件信息不能为空");
         }
         if (!isExists(fileInfo)) {
             throw new BusinessException("文件不存在", 404);
         }
-        if (maxSpeed <= 0) {
-            maxSpeed = Max_Open_Speed;
+        RateLimiter rateLimiter = null;
+        if (maxSpeed > 0) {
+            rateLimiter = RateLimiter.create(maxSpeed);
         }
-        RateLimiter rateLimiter = RateLimiter.create(maxSpeed);
         String fullPath = diskBasePath + fileInfo.getFilePath();
         fullPath = FilenameUtils.concat(fullPath, fileInfo.getNewName());
         File file = new File(fullPath);
         try (InputStream inputStream = FileUtils.openInputStream(file)) {
+            if (off > 0) {
+                long tmp = inputStream.skip(off);
+                if (tmp != off) {
+                    throw new BusinessException("off参数错误", 416);
+                }
+            }
             byte[] data = new byte[8 * 1024];
             int readByte;
-            double sleepTime;
+            long writeSize = 0;
+            double sleepTime = 0;
             while (true) {
                 readByte = inputStream.read(data);
                 if (readByte <= 0) {
                     break;
                 }
-                outputStream.write(data);
-                sleepTime = rateLimiter.acquire(readByte);
+                writeSize += readByte;
+                if (len > 0 && writeSize >= len) {
+                    outputStream.write(data, 0, (int) (len - (writeSize - readByte)));
+                    break;
+                } else {
+                    outputStream.write(data);
+                }
+                if (rateLimiter != null) {
+                    sleepTime = rateLimiter.acquire(readByte);
+                }
                 log.debug("[本地服务器]打开文件NewName:[{}], 读取字节数:[{}], 休眠时间:[{}]秒", fileInfo.getNewName(), readByte, sleepTime);
             }
             outputStream.flush();

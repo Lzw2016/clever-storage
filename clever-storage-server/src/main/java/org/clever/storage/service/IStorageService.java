@@ -16,11 +16,6 @@ import java.io.OutputStream;
 public interface IStorageService {
 
     /**
-     * 文件打开最大速度限制 (1024 * 1024 * 1 = 1MB)
-     */
-    long Max_Open_Speed = 1024 * 1024;
-
-    /**
      * 根据文件签名保存文件，实现文件秒传<br>
      *
      * @param uploadFileReq 请求上传参数
@@ -67,24 +62,17 @@ public interface IStorageService {
     FileInfo getFileInfo(Long fileId);
 
     /**
-     * 打开文件到OutputStream<br>
-     *
-     * @param fileInfo     文件信息
-     * @param outputStream 输出流，用于打开文件
-     * @throws IOException 操作失败
-     */
-    void openFile(FileInfo fileInfo, OutputStream outputStream) throws IOException;
-
-    /**
      * 打开文件到OutputStream(限制打开文件速度，适用于客户端下载文件) 可以控制打开速度<br>
      * <b>注意：使用此方法会限制打开文件速度(字节/秒)</b>
      *
      * @param fileInfo     文件信息
      * @param outputStream 输出流，用于打开文件
-     * @param maxSpeed     最大打开文件速度(字节/秒)，值小于等于0，则使用默认限制速度 {@link #Max_Open_Speed}
+     * @param off          读取起始字节(小于等于0就重头开始读取)
+     * @param len          读取长度(小于等于0就读完数据流)
+     * @param maxSpeed     最大打开文件速度(字节/秒)(值小于等于0则不限速)
      * @throws IOException 操作失败
      */
-    void openFileSpeedLimit(FileInfo fileInfo, OutputStream outputStream, long maxSpeed) throws IOException;
+    void openFileSpeedLimit(FileInfo fileInfo, OutputStream outputStream, long off, long len, long maxSpeed) throws IOException;
 
     /**
      * 删除文件<br>
