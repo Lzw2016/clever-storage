@@ -62,11 +62,11 @@ public class LocalStorageService extends BaseService implements IStorageService 
     public LocalStorageService(GlobalConfig globalConfig) {
         diskBasePath = globalConfig.getLocalStorageConfig().getDiskBasePath();
         if (StringUtils.isBlank(diskBasePath)) {
-            throw new IllegalArgumentException("文件上传到本地硬盘的基础路径(diskBasePath)未配置");
+            throw new IllegalArgumentException("[本地服务器]文件上传到本地硬盘的基础路径(diskBasePath)未配置");
         }
         File file = new File(diskBasePath);
         if (file.exists() && file.isFile()) {
-            throw new IllegalArgumentException("文件上传到本地硬盘的基础路径(diskBasePath)=[" + diskBasePath + "]不能是文件");
+            throw new IllegalArgumentException("[本地服务器]文件上传到本地硬盘的基础路径(diskBasePath)=[" + diskBasePath + "]不能是文件");
         }
         if (!file.exists() && file.mkdirs()) {
             log.info("[本地服务器]创建文件夹：" + diskBasePath);
@@ -74,12 +74,12 @@ public class LocalStorageService extends BaseService implements IStorageService 
 
         storedNode = globalConfig.getLocalStorageConfig().getStoredNode();
         if ("127.0.0.1".equals(storedNode)) {
-            throw new IllegalArgumentException("文件存储节点(storedNode)=[" + storedNode + "]不能是127.0.0.1");
+            throw new IllegalArgumentException("[本地服务器]文件存储节点(storedNode)=[" + storedNode + "]不能是127.0.0.1");
         }
         Set<String> ipAddress = IPAddressUtils.getInet4Address();
         if (!ipAddress.contains(storedNode)) {
             ipAddress.remove("127.0.0.1");
-            throw new IllegalArgumentException("文件存储节点(storedNode)=[" + storedNode + "]可选值：" + ipAddress.toString());
+            throw new IllegalArgumentException("[本地服务器]文件存储节点(storedNode)=[" + storedNode + "]可选值：" + ipAddress.toString());
         }
     }
 
@@ -151,9 +151,10 @@ public class LocalStorageService extends BaseService implements IStorageService 
         // 设置文件存储之后的名称：UUID + 后缀名(此操作依赖文件原名称)
         String newName = StoragePathUtils.generateNewFileName(fileInfo.getFileName());
         fileInfo.setNewName(newName);
+        fileInfo.setFileSuffix(FilenameUtils.getExtension(fileInfo.getFileName()).toLowerCase());
         // 上传文件存储到当前服务器的路径(相对路径，相对于 FILE_STORAGE_PATH)
         String basePath = Objects.equals(EnumConstant.PublicRead_1, fileInfo.getPublicRead()) ? publicReadBasePath : privateReadBasePath;
-        String filePath = StoragePathUtils.generateFilePathByDate(basePath);
+        String filePath = StoragePathUtils.generateFilePathByDate(basePath, File.separator);
         fileInfo.setFilePath(filePath);
         // 计算文件的绝对路径，保存文件
         String absoluteFilePath = diskBasePath + filePath + File.separator + newName;

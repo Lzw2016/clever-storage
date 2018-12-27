@@ -19,6 +19,7 @@ import org.clever.storage.entity.FileInfo;
 import org.clever.storage.utils.ContentTypeUtils;
 import org.clever.storage.utils.FileUploadUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
@@ -43,7 +44,7 @@ public class ManageStorageService {
     private GlobalConfig globalConfig;
 
     @Autowired
-    // @Qualifier("LocalStorageService")
+    @Qualifier("OssStorageService")
     private IStorageService storageService;
 
     /**

@@ -60,6 +60,11 @@ public class FileInfo implements Serializable {
     private String newName;
 
     /**
+     * 文件后缀名
+     */
+    private String fileSuffix;
+
+    /**
      * 是否公开可以访问(0不是，1是)
      */
     private Integer publicRead;

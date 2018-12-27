@@ -5,6 +5,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import org.clever.common.model.request.BaseRequest;
 import org.clever.common.validation.ValidIntegerStatus;
+import org.hibernate.validator.constraints.Length;
 
 import javax.validation.constraints.NotBlank;
 
@@ -26,6 +27,7 @@ public class FileUploadLazyReq extends BaseRequest {
 
     @ApiModelProperty("文件来源")
     @NotBlank
+    @Length(max = 32)
     private String fileSource;
 
     @ApiModelProperty("上传文件原名称")

@@ -148,7 +148,12 @@ clever:
     download-speed-limit: 307200
     local-storage-config:
       disk-base-path: G:\filestoragepath
-      stored-node: 10.2.159.100
+      stored-node: 192.168.31.230
+    ali-oss-config:
+      endpoint: http://oss-cn-hangzhou.aliyuncs.com
+      access-key-id: LTAIzet6zCcLaw1R
+      access-key-secret: p35d2Rm3vWTus9F3nMoQIry83mUkOf
+      bucket-name: clever-dev-bucket
   security:
     enable-debug: false
     sys-name: ${spring.application.name}

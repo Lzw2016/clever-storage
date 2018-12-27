@@ -45,7 +45,8 @@ public class Test01 {
             }
 
             log.info("上传文件");
-            ossClient.putObject(new PutObjectRequest(bucketName, fileKey, createSampleFile()));
+            PutObjectResult putObjectResult = ossClient.putObject(new PutObjectRequest(bucketName, fileKey, createSampleFile()));
+            log.info("[阿里云OSS]上传文件成功 ETag={}", putObjectResult.getETag());
 
             boolean exists = ossClient.doesObjectExist(bucketName, fileKey);
             log.info("文件是否存在，存储空间=[{}]，是否存在=[{}]", bucketName, exists);
