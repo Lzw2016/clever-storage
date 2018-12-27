@@ -9,6 +9,7 @@ import org.clever.common.utils.exception.ExceptionUtils;
 import org.clever.common.utils.mapper.BeanMapper;
 import org.clever.common.utils.validator.BaseValidatorUtils;
 import org.clever.common.utils.validator.ValidatorFactoryUtils;
+import org.clever.storage.config.GlobalConfig;
 import org.clever.storage.dto.request.FileUploadLazyReq;
 import org.clever.storage.dto.request.UploadFileReq;
 import org.clever.storage.dto.response.UploadFilesRes;
@@ -36,6 +37,9 @@ import java.util.function.Function;
 @Component
 @Slf4j
 public class ManageStorageService {
+
+    @Autowired
+    private GlobalConfig globalConfig;
 
     @Autowired
     // @Qualifier("LocalStorageService")
@@ -159,7 +163,7 @@ public class ManageStorageService {
         function.apply(fileInfo);
         try {
             OutputStream outputStream = response.getOutputStream();
-            storageService.openFileSpeedLimit(fileInfo, outputStream, -1);
+            storageService.openFileSpeedLimit(fileInfo, outputStream, globalConfig.getDownloadSpeedLimit());
             outputStream.flush();
             log.info("文件下载成功, 文件NewName={}", fileInfo.getNewName());
         } catch (IOException e) {
@@ -173,11 +177,11 @@ public class ManageStorageService {
             ContentTypeUtils.setContentTypeNoCharset(response, ContentTypeUtils.getContentType(FilenameUtils.getExtension(fileInfo.getFileName())));
             return null;
         });
-        //Servlet容器会关闭
-        try {
-            response.getOutputStream().close();
-        } catch (IOException ignored) {
-        }
+//        //Servlet容器会关闭
+//        try {
+//            response.getOutputStream().close();
+//        } catch (IOException ignored) {
+//        }
     }
 
     public void download(HttpServletRequest request, HttpServletResponse response, String newName) {

@@ -19,7 +19,12 @@ public class GlobalConfig {
     /**
      * 上传限速配置(?byte/s)
      */
-    private long speedLimit = 1024 * 1024 * 2;
+    private long uploadSpeedLimit = 1024 * 1024;
+
+    /**
+     * 下载限速配置(?byte/s)
+     */
+    private long downloadSpeedLimit = 1024 * 1024;
 
     /**
      * 文件上传到本地硬盘的基础路径

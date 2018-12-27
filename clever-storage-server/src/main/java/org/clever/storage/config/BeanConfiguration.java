@@ -90,7 +90,7 @@ public class BeanConfiguration {
     @Bean("multipartResolver")
     protected CommonsMultipartResolver commonsMultipartResolver(GlobalConfig globalConfig, MultipartProperties multipartProperties) {
         MultipartConfigElement multipartConfigElement = multipartProperties.createMultipartConfig();
-        SpeedLimitMultipartResolver speedLimitMultipartResolver = new SpeedLimitMultipartResolver(globalConfig.getSpeedLimit());
+        SpeedLimitMultipartResolver speedLimitMultipartResolver = new SpeedLimitMultipartResolver(globalConfig.getUploadSpeedLimit());
         speedLimitMultipartResolver.setDefaultEncoding("UTF-8");
         speedLimitMultipartResolver.setMaxInMemorySize(multipartConfigElement.getFileSizeThreshold());
         speedLimitMultipartResolver.setMaxUploadSize(multipartConfigElement.getMaxRequestSize());

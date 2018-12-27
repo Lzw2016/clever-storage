@@ -144,7 +144,8 @@ mybatis-plus:
 ###################################################################################
 clever:
   config:
-    speed-limit: 1048576
+    upload-speed-limit: 1048576
+    download-speed-limit: 1048576
     local-storage-config:
       disk-base-path: G:\filestoragepath
       stored-node: 10.2.159.100
