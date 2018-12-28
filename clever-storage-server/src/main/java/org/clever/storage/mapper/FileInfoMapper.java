@@ -15,9 +15,9 @@ import org.springframework.stereotype.Repository;
 @Mapper
 public interface FileInfoMapper extends BaseMapper<FileInfo> {
 
-    @Select("select * from file_info where digest=#{digest} and digest_type=#{digestType} limit 1")
-    FileInfo getFileInfoByDigest(@Param("digest") String digest, @Param("digestType") Integer digestType);
+    @Select("select * from file_info where digest=#{digest} and digest_type=#{digestType} and stored_type=#{storedType} limit 1")
+    FileInfo getFileInfoByDigest(@Param("digest") String digest, @Param("digestType") Integer digestType, @Param("storedType") Integer storedType);
 
-    @Select("select * from file_info where new_name=#{newName} limit 1")
-    FileInfo getByNewName(@Param("newName") String newName);
+    @Select("select * from file_info where new_name=#{newName} and stored_type=#{storedType} limit 1")
+    FileInfo getByNewName(@Param("newName") String newName, @Param("storedType") Integer storedType);
 }

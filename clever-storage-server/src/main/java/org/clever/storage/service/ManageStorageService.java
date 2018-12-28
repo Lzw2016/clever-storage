@@ -189,9 +189,10 @@ public class ManageStorageService {
                 }
             }
             if (len <= 0) {
-                len = fileInfo.getFileSize() - off + 1;
+                len = fileInfo.getFileSize() - off;
             }
         }
+        response.setHeader("Cache-Control", "no-cache");
         response.setHeader("Accept-Ranges", "bytes");
         response.setHeader("Last-Modified", String.valueOf(fileInfo.getUpdateAt() == null ? fileInfo.getCreateAt() : fileInfo.getUpdateAt()));
         response.setHeader("Etag", fileInfo.getDigest());

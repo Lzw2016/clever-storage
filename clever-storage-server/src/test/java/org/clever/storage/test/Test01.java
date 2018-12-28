@@ -4,7 +4,9 @@ import com.aliyun.oss.ClientException;
 import com.aliyun.oss.OSS;
 import com.aliyun.oss.OSSClientBuilder;
 import com.aliyun.oss.OSSException;
+import com.aliyun.oss.event.ProgressEventType;
 import com.aliyun.oss.model.*;
+import com.google.common.util.concurrent.RateLimiter;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.Test;
 
@@ -116,6 +118,63 @@ public class Test01 {
         }
         reader.close();
         log.info("《----------------------------------------------------------------------------------------");
+    }
+
+    @SuppressWarnings("UnstableApiUsage")
+    @Test
+    public void t02() {
+        RateLimiter rateLimiter = RateLimiter.create(1024 * 8);
+        OSS ossClient = new OSSClientBuilder().build(endpoint, accessKeyId, accessKeySecret);
+        log.info("上传文件");
+        PutObjectRequest putObjectRequest = new PutObjectRequest(bucketName, fileKey, new File("D:\\ServiceSoftware\\Tomcat\\apache-tomcat-8.5.30-windows-x64.zip"));
+        putObjectRequest.setProgressListener(progressEvent -> {
+            if (ProgressEventType.TRANSFER_STARTED_EVENT == progressEvent.getEventType()) {
+                log.info("上传开始");
+            } else if (ProgressEventType.TRANSFER_COMPLETED_EVENT == progressEvent.getEventType()) {
+                log.info("上传完成");
+            } else if (ProgressEventType.REQUEST_BYTE_TRANSFER_EVENT == progressEvent.getEventType()) {
+                double sleepTime = rateLimiter.acquire((int) progressEvent.getBytes());
+                log.info("##### progressEvent ====== [{}]  休眠时间:[{}]秒", progressEvent.getBytes(), sleepTime);
+            }
+        });
+        PutObjectResult putObjectResult = ossClient.putObject(putObjectRequest);
+        log.info("[阿里云OSS]上传文件成功 ETag={}", putObjectResult.getETag());
+        ossClient.shutdown();
+    }
+
+    @SuppressWarnings("UnstableApiUsage")
+    @Test
+    public void t03() throws IOException {
+        RateLimiter rateLimiter = RateLimiter.create(1024 * 1024);
+        OSS ossClient = new OSSClientBuilder().build(endpoint, accessKeyId, accessKeySecret);
+
+        log.info("下载文件");
+        GetObjectRequest getObjectRequest = new GetObjectRequest(bucketName, "test/2018/2018-12/2018-12-28/a9690d2a-c0a7-470e-be3c-e0cdeb8986c6.png");
+
+        OSSObject ossObject = ossClient.getObject(getObjectRequest);
+        log.info("文件属性 Content-Type: {}", ossObject.getObjectMetadata().getContentType());
+        FileOutputStream outputStream = new FileOutputStream(new File("C:\\Users\\lzw\\Desktop\\xmind\\1d.png"));
+        try (InputStream inputStream = ossObject.getObjectContent()) {
+            byte[] data = new byte[8 * 1024];
+            int readByte;
+            double sleepTime = 0;
+            while (true) {
+                readByte = inputStream.read(data);
+                if (readByte < 0) {
+                    break;
+                }
+                outputStream.write(data, 0, readByte);
+                if (rateLimiter != null) {
+                    sleepTime = rateLimiter.acquire(readByte);
+                }
+                log.info("[阿里云OSS]打开文件 读取字节数:[{}], 休眠时间:[{}]秒", readByte, sleepTime);
+            }
+            outputStream.flush();
+        }
+
+
+        outputStream.close();
+        ossClient.shutdown();
     }
 }
 

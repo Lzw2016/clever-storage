@@ -36,9 +36,9 @@ public interface IStorageService {
      * @param uploadTime    文件上传所用时间
      * @param multipartFile 上传的文件信息
      * @return 返回存储后的文件信息
-     * @throws Exception 保存失败抛出异常
+     * @throws IOException 保存失败抛出异常
      */
-    FileInfo saveFile(UploadFileReq uploadFileReq, long uploadTime, MultipartFile multipartFile) throws Exception;
+    FileInfo saveFile(UploadFileReq uploadFileReq, long uploadTime, MultipartFile multipartFile) throws IOException;
 
     /**
      * 判断文件在服务端是否存在<br>

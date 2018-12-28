@@ -67,7 +67,7 @@ spring:
         characterEncoding: utf-8
         zeroDateTimeBehavior: convert_to_null
         useSSL: false
-      auto-commit: false
+      auto-commit: true
       maximum-pool-size: 100
       minimum-idle: 5
       max-lifetime: 1800000
@@ -145,10 +145,10 @@ mybatis-plus:
 clever:
   config:
     upload-speed-limit: 1048576
-    download-speed-limit: 307200
+    download-speed-limit: 614400
     local-storage-config:
       disk-base-path: G:\filestoragepath
-      stored-node: 192.168.31.230
+      stored-node: 10.2.159.100
     ali-oss-config:
       endpoint: http://oss-cn-hangzhou.aliyuncs.com
       access-key-id: LTAIzet6zCcLaw1R

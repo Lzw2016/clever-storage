@@ -6,22 +6,15 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.clever.common.exception.BusinessException;
-import org.clever.common.server.service.BaseService;
 import org.clever.common.utils.IPAddressUtils;
-import org.clever.common.utils.mapper.BeanMapper;
 import org.clever.storage.config.GlobalConfig;
 import org.clever.storage.dto.request.UploadFileReq;
 import org.clever.storage.entity.EnumConstant;
 import org.clever.storage.entity.FileInfo;
 import org.clever.storage.mapper.FileInfoMapper;
-import org.clever.storage.service.IStorageService;
-import org.clever.storage.utils.FileDigestUtils;
-import org.clever.storage.utils.FileUploadUtils;
 import org.clever.storage.utils.StoragePathUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
@@ -37,10 +30,9 @@ import java.util.Set;
  * 作者：LiZW <br/>
  * 创建时间：2016/11/17 22:17 <br/>
  */
-@Transactional(readOnly = true)
 @Service("LocalStorageService")
 @Slf4j
-public class LocalStorageService extends BaseService implements IStorageService {
+public class LocalStorageService extends AbstractStorageService {
 
     private static final String publicReadBasePath = File.separator + "public-read";
     private static final String privateReadBasePath = File.separator + "private-read";
@@ -83,88 +75,44 @@ public class LocalStorageService extends BaseService implements IStorageService 
         }
     }
 
-    @Transactional
     @Override
-    public FileInfo lazySaveFile(UploadFileReq uploadFileReq, long uploadTime, String fileName, String digest, Integer digestType) {
-        if (StringUtils.isBlank(digest) || digestType == null) {
-            return null;
-        }
-        // 到数据库查找判断此文件是否已经上传过了 - 此文件是否已经上传过了，不需要重复保存
-        FileInfo dbFileInfo = fileInfoMapper.getFileInfoByDigest(digest, digestType);
-        if (dbFileInfo == null) {
-            log.debug("[本地服务器]秒传失败，文件没有上传过");
-            return null;
-        }
-        if (StringUtils.isBlank(dbFileInfo.getFilePath()) || StringUtils.isBlank(dbFileInfo.getNewName())) {
-            log.warn("[本地服务器]秒传失败，数据库里文件(FilePath、NewName)信息为空，文件ID={}", dbFileInfo.getId());
-            return null;
-        }
-        String filepath = diskBasePath + dbFileInfo.getFilePath() + File.separator + dbFileInfo.getNewName();
-        File file = new File(filepath);
-        if (!file.exists() || !file.isFile()) {
-            log.warn("[本地服务器]秒传失败，上传文件不存在(可能已经被删除)，文件路径[{}]", filepath);
-            return null;
-        }
-        // 需要新增记录
-        FileInfo newFileInfo = BeanMapper.mapper(dbFileInfo, FileInfo.class);
-        newFileInfo.setId(null);
-        newFileInfo.setUpdateAt(null);
-        newFileInfo.setCreateAt(null);
-        newFileInfo.setPublicRead(uploadFileReq.getPublicRead());
-        newFileInfo.setPublicWrite(uploadFileReq.getPublicWrite());
-        newFileInfo.setFileSource(uploadFileReq.getFileSource());
-        newFileInfo.setUploadTime(uploadTime);
-        newFileInfo.setFileName(fileName);
-        newFileInfo.setStoredTime(0L);
-        // TODO 私有读 -> 公开可读(需要转移文件)
-        //newFileInfo.setNewName(StoragePathUtils.generateNewFileName(fileName));
-        fileInfoMapper.insert(newFileInfo);
-        log.info("[本地服务器]文件秒传成功，文件存储路径[{}]", filepath);
-        return newFileInfo;
+    protected FileInfoMapper getFileInfoMapper() {
+        return fileInfoMapper;
     }
 
-    @Transactional
     @Override
-    public FileInfo saveFile(UploadFileReq uploadFileReq, long uploadTime, MultipartFile multipartFile) throws Exception {
-        // 设置文件签名类型 和 文件签名
-        String digest;
-        try (InputStream inputStream = multipartFile.getInputStream()) {
-            digest = FileDigestUtils.FileDigestByMD5(inputStream);
-        }
-        // 通过文件签名检查服务器端是否有相同文件
-        FileInfo lazyFileInfo = this.lazySaveFile(uploadFileReq, uploadTime, multipartFile.getOriginalFilename(), digest, EnumConstant.DigestType_1);
-        if (lazyFileInfo != null) {
-            return lazyFileInfo;
-        }
-        // 服务器端不存在相同文件
-        FileInfo fileInfo = new FileInfo();
-        fileInfo = FileUploadUtils.fillFileInfo(fileInfo, multipartFile);
-        fileInfo.setPublicRead(uploadFileReq.getPublicRead());
-        fileInfo.setPublicWrite(uploadFileReq.getPublicWrite());
-        fileInfo.setFileSource(uploadFileReq.getFileSource());
-        fileInfo.setUploadTime(uploadTime);
-        fileInfo.setDigest(digest);
-        fileInfo.setDigestType(EnumConstant.DigestType_1);
-        // 上传文件的存储类型：当前服务器硬盘
-        fileInfo.setStoredType(EnumConstant.StoredType_1);
-        fileInfo.setStoredNode(storedNode);
-        // 设置文件存储之后的名称：UUID + 后缀名(此操作依赖文件原名称)
-        String newName = StoragePathUtils.generateNewFileName(fileInfo.getFileName());
-        fileInfo.setNewName(newName);
-        fileInfo.setFileSuffix(FilenameUtils.getExtension(fileInfo.getFileName()).toLowerCase());
+    protected String getStoredNode() {
+        return storedNode;
+    }
+
+    @Override
+    protected Integer getStoredType() {
+        return EnumConstant.StoredType_1;
+    }
+
+    // 秒传文件处理
+    @Override
+    protected void internalLazySaveFile(FileInfo dbFileInfo, FileInfo newFileInfo) {
+        // TODO 私有读 -> 公开可读(需要转移文件)
+        //newFileInfo.setNewName(StoragePathUtils.generateNewFileName(fileName));
+    }
+
+    // 上传文件
+    @Override
+    protected void internalSaveFile(FileInfo fileInfo, UploadFileReq uploadFileReq, long uploadTime, MultipartFile multipartFile) throws IOException {
         // 上传文件存储到当前服务器的路径(相对路径，相对于 FILE_STORAGE_PATH)
         String basePath = Objects.equals(EnumConstant.PublicRead_1, fileInfo.getPublicRead()) ? publicReadBasePath : privateReadBasePath;
         String filePath = StoragePathUtils.generateFilePathByDate(basePath, File.separator);
         fileInfo.setFilePath(filePath);
         // 计算文件的绝对路径，保存文件
-        String absoluteFilePath = diskBasePath + filePath + File.separator + newName;
+        String absoluteFilePath = diskBasePath + filePath + File.separator + fileInfo.getNewName();
         File file = new File(absoluteFilePath);
         long storageStart = System.currentTimeMillis();
         // 文件夹不存在，创建文件夹
         File parentFile = file.getParentFile();
         if (parentFile != null && !parentFile.exists()) {
             if (parentFile.mkdirs()) {
-                log.info("[本地服务器]创建文件夹：" + parentFile.getPath());
+                log.info("创建文件夹：" + parentFile.getPath());
             } else {
                 throw new RuntimeException("创建文件夹[" + parentFile.getPath() + "]失败");
             }
@@ -179,9 +127,6 @@ public class LocalStorageService extends BaseService implements IStorageService 
 //        if (Objects.equals(EnumConstant.PublicRead_1, fileInfo.getPublicRead())) {
 //            fileInfo.setReadUrl("");
 //        }
-        // 保存文件信息
-        fileInfoMapper.insert(fileInfo);
-        return fileInfo;
     }
 
     @Override
@@ -199,28 +144,10 @@ public class LocalStorageService extends BaseService implements IStorageService 
         return false;
     }
 
-    @Override
-    public FileInfo getFileInfo(String newName) {
-        FileInfo fileInfo = fileInfoMapper.getByNewName(newName);
-        return isExists(fileInfo) ? fileInfo : null;
-    }
-
-    @Override
-    public FileInfo getFileInfo(Long fileId) {
-        FileInfo fileInfo = fileInfoMapper.selectById(fileId);
-        return isExists(fileInfo) ? fileInfo : null;
-    }
-
+    // 限速打开文件
     @SuppressWarnings("UnstableApiUsage")
-    @Transactional(propagation = Propagation.NEVER)
     @Override
-    public void openFileSpeedLimit(FileInfo fileInfo, OutputStream outputStream, long off, long len, long maxSpeed) throws IOException {
-        if (fileInfo == null) {
-            throw new IllegalArgumentException("文件信息不能为空");
-        }
-        if (!isExists(fileInfo)) {
-            throw new BusinessException("文件不存在", 404);
-        }
+    protected void internalOpenFileSpeedLimit(FileInfo fileInfo, OutputStream outputStream, long off, long len, long maxSpeed) throws IOException {
         RateLimiter rateLimiter = null;
         if (maxSpeed > 0) {
             rateLimiter = RateLimiter.create(maxSpeed);
@@ -241,7 +168,10 @@ public class LocalStorageService extends BaseService implements IStorageService 
             double sleepTime = 0;
             while (true) {
                 readByte = inputStream.read(data);
-                if (readByte <= 0) {
+                if (readByte == 0) {
+                    continue;
+                }
+                if (readByte < 0) {
                     break;
                 }
                 writeSize += readByte;
@@ -249,7 +179,7 @@ public class LocalStorageService extends BaseService implements IStorageService 
                     outputStream.write(data, 0, (int) (len - (writeSize - readByte)));
                     break;
                 } else {
-                    outputStream.write(data);
+                    outputStream.write(data, 0, readByte);
                 }
                 if (rateLimiter != null) {
                     sleepTime = rateLimiter.acquire(readByte);
@@ -260,25 +190,15 @@ public class LocalStorageService extends BaseService implements IStorageService 
         }
     }
 
-    @Transactional
+    // 彻底删除文件
     @Override
-    public FileInfo deleteFile(Long fileId) {
-        FileInfo fileInfo = fileInfoMapper.selectById(fileId);
-        if (fileInfo == null) {
-            throw new BusinessException("文件不存在");
+    protected void internalDeleteFile(FileInfo fileInfo) {
+        String fullPath = diskBasePath + fileInfo.getFilePath();
+        fullPath = FilenameUtils.concat(fullPath, fileInfo.getNewName());
+        File file = new File(fullPath);
+        if (!file.delete()) {
+            throw new BusinessException("[本地服务器]文件删除失败：" + fullPath);
         }
-        fileInfoMapper.deleteById(fileId);
-        FileInfo other = fileInfoMapper.getFileInfoByDigest(fileInfo.getDigest(), fileInfo.getDigestType());
-        if (other == null && isExists(fileInfo)) {
-            // 彻底删除文件
-            String fullPath = diskBasePath + fileInfo.getFilePath();
-            fullPath = FilenameUtils.concat(fullPath, fileInfo.getNewName());
-            File file = new File(fullPath);
-            if (!file.delete()) {
-                throw new BusinessException("[本地服务器]文件删除失败：" + fullPath);
-            }
-        }
-        return fileInfo;
     }
 }
 

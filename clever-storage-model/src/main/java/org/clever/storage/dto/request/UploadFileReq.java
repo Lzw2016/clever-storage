@@ -3,11 +3,12 @@ package org.clever.storage.dto.request;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
+import org.clever.common.PatternConstant;
 import org.clever.common.model.request.BaseRequest;
 import org.clever.common.validation.ValidIntegerStatus;
-import org.hibernate.validator.constraints.Length;
 
 import javax.validation.constraints.NotBlank;
+import javax.validation.constraints.Pattern;
 
 /**
  * 作者： lzw<br/>
@@ -27,6 +28,6 @@ public class UploadFileReq extends BaseRequest {
 
     @ApiModelProperty("文件来源")
     @NotBlank
-    @Length(max = 32)
+    @Pattern(regexp = PatternConstant.Name_Pattern + "{3,64}")
     private String fileSource;
 }
