@@ -38,11 +38,11 @@ public class GlobalConfig {
     @NestedConfigurationProperty
     private AliOssConfig aliOssConfig;
 
-    /**
-     * Ftp配置
-     */
-    @NestedConfigurationProperty
-    private FtpConfig ftpConfig;
+//    /**
+//     * Ftp配置
+//     */
+//    @NestedConfigurationProperty
+//    private FtpConfig ftpConfig;
 
     @Data
     public static class LocalStorageConfig implements Serializable {
@@ -61,11 +61,11 @@ public class GlobalConfig {
         private String bucketName;
     }
 
-    @Data
-    public static class FtpConfig implements Serializable {
-        public String host;
-        public String port;
-        public Integer username;
-        public String password;
-    }
+//    @Data
+//    public static class FtpConfig implements Serializable {
+//        public String host;
+//        public String port;
+//        public Integer username;
+//        public String password;
+//    }
 }
