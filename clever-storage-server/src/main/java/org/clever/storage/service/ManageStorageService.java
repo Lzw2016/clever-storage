@@ -44,7 +44,7 @@ public class ManageStorageService {
     private GlobalConfig globalConfig;
 
     @Autowired
-    @Qualifier("LocalStorageService")
+    @Qualifier("OssStorageService")
     private IStorageService storageService;
 
     /**

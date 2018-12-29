@@ -21,6 +21,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.Objects;
 
 /**
  * 作者： lzw<br/>
@@ -51,8 +52,9 @@ public abstract class AbstractStorageService implements IStorageService {
             log.warn("秒传失败，数据库里文件(FilePath、NewName)信息为空，文件ID={}", dbFileInfo.getId());
             return null;
         }
+        String separator = Objects.equals(EnumConstant.StoredType_3, dbFileInfo.getStoredType()) ? "/" : File.separator;
         if (!isExists(dbFileInfo)) {
-            log.warn("秒传失败，上传文件不存在(可能已经被删除)，文件路径[{}]", dbFileInfo.getFilePath() + File.separator + dbFileInfo.getNewName());
+            log.warn("秒传失败，上传文件不存在(可能已经被删除)，文件路径[{}]", dbFileInfo.getFilePath() + separator + dbFileInfo.getNewName());
             return null;
         }
         // 需要新增记录
@@ -68,7 +70,7 @@ public abstract class AbstractStorageService implements IStorageService {
         newFileInfo.setStoredTime(0L);
         internalLazySaveFile(dbFileInfo, newFileInfo);
         getFileInfoMapper().insert(newFileInfo);
-        log.info("文件秒传成功，文件存储路径[{}]", dbFileInfo.getFilePath() + File.separator + dbFileInfo.getNewName());
+        log.info("文件秒传成功，文件存储路径[{}]", dbFileInfo.getFilePath() + separator + dbFileInfo.getNewName());
         return newFileInfo;
     }
 

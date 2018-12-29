@@ -70,8 +70,19 @@ public class OssStorageService extends AbstractStorageService implements Closeab
     // 秒传文件处理
     @Override
     protected void internalLazySaveFile(FileInfo dbFileInfo, FileInfo newFileInfo) {
-        // TODO 私有读 -> 公开可读(需要转移文件)
-        //newFileInfo.setNewName(StoragePathUtils.generateNewFileName(fileName));
+        // 私有读 -> 公开可读
+        if (Objects.equals(dbFileInfo.getPublicRead(), EnumConstant.PublicRead_0) && Objects.equals(newFileInfo.getPublicRead(), EnumConstant.PublicRead_1)) {
+            // 私有文件
+            String privateFilePath = dbFileInfo.getFilePath() + "/" + dbFileInfo.getNewName();
+            // // 公开文件
+            // newFileInfo.setFilePath(StoragePathUtils.generateFilePathByDate(newFileInfo.getFileSource(), "/"));
+            // newFileInfo.setNewName(StoragePathUtils.generateNewFileName(newFileInfo.getFileName()));
+            // String publicFilePath = newFileInfo.getFilePath() + "/" + newFileInfo.getNewName();
+            // CopyObjectRequest copyObjectRequest = new CopyObjectRequest(storedNode, privateFilePath, storedNode, publicFilePath);
+            // ossClient.copyObject(copyObjectRequest);
+            // ossClient.setObjectAcl(storedNode, publicFilePath, CannedAccessControlList.PublicRead);
+            ossClient.setObjectAcl(storedNode, privateFilePath, CannedAccessControlList.PublicRead);
+        }
     }
 
     // 上传文件
