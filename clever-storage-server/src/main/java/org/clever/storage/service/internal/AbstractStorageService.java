@@ -159,7 +159,7 @@ public abstract class AbstractStorageService implements IStorageService {
             throw new BusinessException("文件不存在");
         }
         getFileInfoMapper().deleteById(fileId);
-        FileInfo other = getFileInfoMapper().getFileInfoByDigest(fileInfo.getDigest(), fileInfo.getDigestType(), getStoredType());
+        FileInfo other = getFileInfoMapper().getByDigestAndPath(fileInfo.getDigest(), fileInfo.getFilePath(), fileInfo.getNewName());
         if (other == null && isExists(fileInfo)) {
             internalDeleteFile(fileInfo);
         }
