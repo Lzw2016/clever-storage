@@ -7,6 +7,7 @@ import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.clever.common.exception.BusinessException;
 import org.clever.common.utils.IPAddressUtils;
+import org.clever.common.utils.exception.ExceptionUtils;
 import org.clever.storage.config.GlobalConfig;
 import org.clever.storage.dto.request.UploadFileReq;
 import org.clever.storage.entity.EnumConstant;
@@ -93,8 +94,21 @@ public class LocalStorageService extends AbstractStorageService {
     // 秒传文件处理
     @Override
     protected void internalLazySaveFile(FileInfo dbFileInfo, FileInfo newFileInfo) {
-        // TODO 私有读 -> 公开可读(需要转移文件)
-        //newFileInfo.setNewName(StoragePathUtils.generateNewFileName(fileName));
+        // 私有读 -> 公开可读(需要转移文件)
+        if (Objects.equals(dbFileInfo.getPublicRead(), EnumConstant.PublicRead_0) && Objects.equals(newFileInfo.getPublicRead(), EnumConstant.PublicRead_1)) {
+            // 私有文件
+            String privateFilePath = diskBasePath + dbFileInfo.getFilePath() + File.separator + dbFileInfo.getNewName();
+            File privateFile = new File(privateFilePath);
+            // 公开文件
+            newFileInfo.setFilePath(newFileInfo.getFilePath().replace(privateReadBasePath, publicReadBasePath));
+            String publicFilePath = diskBasePath + newFileInfo.getFilePath() + File.separator + dbFileInfo.getNewName();
+            File publicFile = new File(publicFilePath);
+            try {
+                FileUtils.copyFile(privateFile, publicFile);
+            } catch (IOException e) {
+                throw ExceptionUtils.unchecked(e);
+            }
+        }
     }
 
     // 上传文件

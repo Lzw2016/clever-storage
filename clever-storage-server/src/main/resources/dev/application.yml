@@ -151,8 +151,8 @@ clever:
       stored-node: 10.2.159.100
     ali-oss-config:
       endpoint: http://oss-cn-hangzhou.aliyuncs.com
-      access-key-id: LTAIzet6zCcLaw1R
-      access-key-secret: p35d2Rm3vWTus9F3nMoQIry83mUkOf
+      access-key-id: LTAIzet5zCcLaw1R
+      access-key-secret: p25d2Rm3vWTus9F3nMoQIry83mUkOf
       bucket-name: clever-dev-bucket
   security:
     enable-debug: false
