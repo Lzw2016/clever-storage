@@ -1,5 +1,6 @@
 package org.clever.storage.servlet;
 
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.fileupload.FileItem;
 import org.apache.commons.fileupload.FileUpload;
 import org.apache.commons.fileupload.FileUploadBase;
@@ -21,6 +22,7 @@ import java.util.List;
  * @see CommonsMultipartResolver
  */
 @SuppressWarnings("NullableProblems")
+@Slf4j
 public class SpeedLimitMultipartResolver extends CommonsMultipartResolver {
 
     /**
@@ -60,7 +62,19 @@ public class SpeedLimitMultipartResolver extends CommonsMultipartResolver {
         fileUpload.setProgressListener(speedLimitProgressListener);
         try {
             List<FileItem> fileItems = ((ServletFileUpload) fileUpload).parseRequest(request);
-            return parseFileItems(fileItems, encoding);
+            MultipartParsingResult multipartParsingResult = parseFileItems(fileItems, encoding);
+            // 删除Form表单数据对应的临时文件
+            for (FileItem fileItem : fileItems) {
+                if (fileItem.isFormField()) {
+                    try {
+                        fileItem.delete();
+                    } catch (Throwable e) {
+                        log.warn("无法删除临时文件:[{}]", fileItem.getFieldName(), e);
+                    }
+                    log.info("Cleaning up form part, fieldName '{}'", fileItem.getFieldName());
+                }
+            }
+            return multipartParsingResult;
         } catch (FileUploadBase.SizeLimitExceededException ex) {
             throw new MaxUploadSizeExceededException(fileUpload.getSizeMax(), ex);
         } catch (FileUploadBase.FileSizeLimitExceededException ex) {
